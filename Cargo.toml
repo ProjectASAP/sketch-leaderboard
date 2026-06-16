@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 asap_sketchlib = "0.2.2"
+serde_json = "1"

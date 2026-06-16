@@ -5,6 +5,7 @@ mod ddsketch;
 mod hll;
 mod kll;
 mod leaderboard;
+mod profiles;
 
 fn main() {
     let arg = std::env::args().nth(1);
@@ -26,9 +27,16 @@ fn main() {
         Some("kll") => kll::run(),
         Some("dd") | Some("ddsketch") => ddsketch::run(),
         Some("bench") | Some("leaderboard") => bench::run(),
+        Some("profiles") => {
+            let path = std::env::args().nth(2).unwrap_or_else(|| {
+                eprintln!("usage: cargo run -- profiles <path/to/results.jsonl>");
+                std::process::exit(1);
+            });
+            profiles::run(&path);
+        }
         Some(other) => {
-            eprintln!("unknown sketch: {other}");
-            eprintln!("usage: cargo run -- [all|hll|cms|cs|kll|dd|bench]");
+            eprintln!("unknown command: {other}");
+            eprintln!("usage: cargo run -- [all|hll|cms|cs|kll|dd|bench|profiles <file>]");
             std::process::exit(1);
         }
     }
