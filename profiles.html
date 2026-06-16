@@ -76,13 +76,27 @@
            box-shadow:0 3px 12px var(--glow)}
   .chip.on .dot{opacity:1;background:#04202b}
 
+  /* ---- statistic (numeric) filters ---- */
+  .statbar{padding:.7rem 1.6rem;display:flex;gap:1.2rem;flex-wrap:wrap;align-items:center;
+           border-bottom:1px solid var(--border)}
+  .statbar > .facet-label{min-width:74px}
+  .statf{display:flex;align-items:center;gap:.4rem}
+  .statf .nm{font-size:.68rem;font-weight:700;color:var(--dim)}
+  .statf input{width:60px;background:var(--card);border:1px solid var(--border);color:var(--text);
+       padding:.3rem .45rem;border-radius:7px;font:inherit;font-size:.76rem;text-align:right;
+       transition:.15s}
+  .statf input::-webkit-inner-spin-button{opacity:.35}
+  .statf input:focus{outline:0;border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
+  .statf input.set{border-color:var(--accent);color:var(--accent)}
+  .statf .sep{color:var(--faint);font-size:.7rem}
+
   /* ---- info bar ---- */
   #info{color:var(--dim);font-size:.74rem;padding:.5rem 1.6rem;display:flex;
         align-items:center;gap:.5rem;border-bottom:1px solid var(--border)}
   #info b{color:var(--accent)}
 
   /* ---- table ---- */
-  .wrap{overflow:auto;max-height:calc(100vh - 250px)}
+  .wrap{overflow:auto;max-height:calc(100vh - 320px)}
   table{border-collapse:separate;border-spacing:0;width:100%;font-size:.8rem}
   thead{position:sticky;top:0;z-index:10}
   th{padding:.6rem .85rem;text-align:left;background:var(--bg2);
@@ -124,7 +138,7 @@
 <header>
   <div class="title">
     <h1>sketch-bench profiles</h1>
-    <span class="pill" id="rowpill">357 runs</span>
+    <span class="pill" id="rowpill">&nbsp;</span>
   </div>
   <div class="source">..\sketch-bench\output\profiles\all.jsonl</div>
   <div class="toolbar">
@@ -143,6 +157,7 @@
 </header>
 
 <div class="facets" id="facets"></div>
+<div class="statbar" id="statbar"><span class="facet-label">Stats</span></div>
 <div id="info"></div>
 
 <div class="wrap">
@@ -176,18 +191,27 @@ const VS={
   query:{c:'query_mops',d:'desc'},
   memory:{c:'memory_bytes',d:'asc'}
 };
-// facet groups: multi-select within a group (OR), across groups (AND). empty set = match all.
+// categorical facets: multi-select within a group (OR), across groups (AND). empty = all.
 const FACETS=[
   {key:'sketch',  label:'Sketch'},
   {key:'workload',label:'Workload'},
   {key:'impl',    label:'Impl'},
   {key:'acc_label',label:'Metric'}
 ];
+// numeric statistic filters: min/max range per metric. scale converts input -> row units.
+const NUMF=[
+  {key:'insert_mops', label:'Insert M/s', scale:1},
+  {key:'query_mops',  label:'Query M/s',  scale:1},
+  {key:'memory_bytes',label:'Memory KB',  scale:1024},
+  {key:'accuracy',    label:'Accuracy',   scale:1}
+];
 const SKETCH_COLOR={cms:'#5ad1ff',countsketch:'#7c8cff',hll:'#5be9b9',kll:'#ffd166'};
 function implColor(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))%360;return h;}
 
 let S={view:'all',col:'sketch',dir:'asc',q:'',
-       sel:{sketch:new Set(),workload:new Set(),impl:new Set(),acc_label:new Set()}};
+       sel:{sketch:new Set(),workload:new Set(),impl:new Set(),acc_label:new Set()},
+       num:{insert_mops:{min:null,max:null},query_mops:{min:null,max:null},
+            memory_bytes:{min:null,max:null},accuracy:{min:null,max:null}}};
 
 const MAXI=Math.max(...DATA.map(r=>r.insert_mops||0));
 const MAXQ=Math.max(...DATA.map(r=>r.query_mops||0));
@@ -212,7 +236,7 @@ function accCell(v){
   return '<td class="r" style="font-variant-numeric:tabular-nums">'+v.toFixed(4)+'</td>';
 }
 
-/* ---------- facets ---------- */
+/* ---------- categorical facets ---------- */
 function buildFacets(){
   const host=document.getElementById('facets');
   host.innerHTML='';
@@ -236,11 +260,41 @@ function buildFacets(){
   });
 }
 
+/* ---------- numeric statistic filters ---------- */
+function buildStatFilters(){
+  const host=document.getElementById('statbar');
+  NUMF.forEach(nf=>{
+    const g=document.createElement('div');g.className='statf';
+    g.innerHTML='<span class="nm">'+nf.label+'</span>';
+    ['min','max'].forEach((bound,i)=>{
+      const inp=document.createElement('input');
+      inp.type='number';inp.placeholder=bound;inp.step='any';
+      inp.addEventListener('input',()=>{
+        const val=inp.value.trim();
+        S.num[nf.key][bound]=val===''?null:parseFloat(val);
+        inp.classList.toggle('set',val!=='');
+        render();
+      });
+      g.appendChild(inp);
+      if(i===0){const s=document.createElement('span');s.className='sep';s.textContent='–';g.appendChild(s);}
+    });
+    host.appendChild(g);
+  });
+}
+
 /* ---------- render ---------- */
 function render(){
   const q=S.q.trim().toLowerCase();
   let rows=DATA.filter(r=>{
     for(const f of FACETS){const set=S.sel[f.key];if(set.size&&!set.has(r[f.key]))return false;}
+    for(const nf of NUMF){
+      const rng=S.num[nf.key], v=r[nf.key];
+      if(rng.min!==null||rng.max!==null){
+        if(v===null||v===undefined)return false;
+        if(rng.min!==null&&v<rng.min*nf.scale)return false;
+        if(rng.max!==null&&v>rng.max*nf.scale)return false;
+      }
+    }
     if(S.view==='query'&&r.query_mops===null)return false;
     if(q){
       const hay=(r.sketch+' '+r.impl+' '+r.config+' '+r.workload+' '+r.acc_label).toLowerCase();
@@ -256,7 +310,7 @@ function render(){
     const ih=implColor(r.impl);
     const best=perfView&&i===0;
     return '<tr class="'+(best?'best':'')+'">'+
-      '<td><span class="sketch-tag" style="color:'+sc+'">'+(best?'<span class="rankdot">\u2605 </span>':'')+esc(r.sketch)+'</span></td>'+
+      '<td><span class="sketch-tag" style="color:'+sc+'">'+(best?'<span class="rankdot">★ </span>':'')+esc(r.sketch)+'</span></td>'+
       '<td><span class="badge" style="color:hsl('+ih+',70%,72%);background:hsla('+ih+',70%,55%,.13);border-color:hsla('+ih+',70%,60%,.3)">'+esc(r.impl)+'</span></td>'+
       '<td class="cfg" title="'+esc(r.config)+'">'+esc(r.config)+'</td>'+
       '<td class="na">'+esc(r.workload)+'</td>'+
@@ -269,7 +323,8 @@ function render(){
   }).join('');
 
   document.getElementById('empty').style.display=rows.length?'none':'block';
-  const active=FACETS.reduce((n,f)=>n+S.sel[f.key].size,0)+(q?1:0);
+  let active=FACETS.reduce((n,f)=>n+S.sel[f.key].size,0)+(q?1:0);
+  NUMF.forEach(nf=>{if(S.num[nf.key].min!==null||S.num[nf.key].max!==null)active++;});
   document.getElementById('info').innerHTML=
     'Showing <b>'+rows.length+'</b> of '+DATA.length+' runs'+
     (active?' &middot; '+active+' filter'+(active>1?'s':'')+' active':'');
@@ -278,7 +333,7 @@ function render(){
   document.querySelectorAll('th[data-col]').forEach(th=>{
     const sorted=th.dataset.col===S.col;
     th.classList.toggle('sorted',sorted);
-    th.textContent=th.dataset.lbl+(sorted?(S.dir==='asc'?' \u25B2':' \u25BC'):'');
+    th.textContent=th.dataset.lbl+(sorted?(S.dir==='asc'?' ▲':' ▼'):'');
   });
 }
 
@@ -293,8 +348,10 @@ document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
 document.getElementById('q').addEventListener('input',e=>{S.q=e.target.value;render();});
 document.getElementById('reset').addEventListener('click',()=>{
   FACETS.forEach(f=>S.sel[f.key].clear());
+  NUMF.forEach(nf=>{S.num[nf.key].min=null;S.num[nf.key].max=null;});
   S.q='';document.getElementById('q').value='';
   document.querySelectorAll('.chip.on').forEach(c=>c.classList.remove('on'));
+  document.querySelectorAll('.statf input').forEach(i=>{i.value='';i.classList.remove('set');});
   render();
 });
 document.querySelectorAll('th[data-col]').forEach(th=>{
@@ -307,6 +364,7 @@ document.querySelectorAll('th[data-col]').forEach(th=>{
 });
 
 buildFacets();
+buildStatFilters();
 render();
 </script>
 </body>
