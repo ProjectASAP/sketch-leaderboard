@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sketch-bench profiles</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="title">
+    <h1>sketch-bench profiles</h1>
+    <span class="pill" id="rowpill">&nbsp;</span>
+  </div>
+  <div class="source" id="source">no file loaded</div>
+  <div class="toolbar">
+    <div class="tabs">
+      <button class="tab active" data-view="all">&#9776; All</button>
+      <button class="tab" data-view="insert">&#9889; Best Insert</button>
+      <button class="tab" data-view="query">&#128270; Best Query</button>
+      <button class="tab" data-view="memory">&#129518; Least Memory</button>
+    </div>
+    <label class="search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="q" type="text" placeholder="Search impl, config, sketch...">
+    </label>
+    <button class="btn" id="reset">Reset filters</button>
+  </div>
+</header>
+
+<div class="facets" id="facets"></div>
+<div class="statbar" id="statbar"><span class="facet-label">Stats</span></div>
+<div id="info"></div>
+
+<div class="wrap">
+<table>
+<thead><tr>
+  <th data-col="sketch">Sketch</th>
+  <th data-col="impl">Impl</th>
+  <th data-col="config">Config</th>
+  <th data-col="workload">Workload</th>
+  <th data-col="insert_mops" class="r">Insert&nbsp;M/s</th>
+  <th data-col="query_mops" class="r">Query&nbsp;M/s</th>
+  <th data-col="memory_bytes" class="r">Memory</th>
+  <th data-col="accuracy" class="r">Accuracy</th>
+  <th data-col="acc_label">Metric</th>
+</tr></thead>
+<tbody id="tb"></tbody>
+</table>
+</div>
+<div class="empty" id="empty" style="display:none">
+  <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+  <div>No runs match your filters.</div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
