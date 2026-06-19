@@ -1,0 +1,28 @@
+name: Leaderboard CI
+
+on:
+  push:
+    branches: [main]
+    paths: ["leaderboard/**"]
+  pull_request:
+    paths: ["leaderboard/**"]
+
+jobs:
+  lint-and-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: leaderboard
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: leaderboard/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run build
