@@ -10,17 +10,11 @@ function Navbar() {
         gap: "20px",
       }}
     >
-      <Link
-        to="/"
-        style={{ color: "white", textDecoration: "none" }}
-      >
+      <Link to="/" style={{ color: "white", textDecoration: "none" }}>
         Home
       </Link>
 
-      <Link
-        to="/results"
-        style={{ color: "white", textDecoration: "none" }}
-      >
+      <Link to="/results" style={{ color: "white", textDecoration: "none" }}>
         Results
       </Link>
     </nav>

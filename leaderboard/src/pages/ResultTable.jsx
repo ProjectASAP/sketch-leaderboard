@@ -69,11 +69,11 @@ function ResultTable() {
               <td>
                 {item.bench?.query_throughput_items_per_sec?.mean
                   ? item.bench.query_throughput_items_per_sec.mean.toLocaleString(
-                    undefined,
-                    {
-                      maximumFractionDigits: 0,
-                    }
-                  )
+                      undefined,
+                      {
+                        maximumFractionDigits: 0,
+                      },
+                    )
                   : "-"}
               </td>
 
@@ -84,9 +84,7 @@ function ResultTable() {
               </td>
 
               <td>
-                <button onClick={() => setSelectedRecord(item)}>
-                  View
-                </button>
+                <button onClick={() => setSelectedRecord(item)}>View</button>
               </td>
             </tr>
           ))}
