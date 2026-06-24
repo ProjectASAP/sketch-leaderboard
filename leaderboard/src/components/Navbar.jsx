@@ -17,6 +17,10 @@ function Navbar() {
       <Link to="/results" style={{ color: "white", textDecoration: "none" }}>
         Results
       </Link>
+
+      <Link to="/sketch" style={{ color: "white", textDecoration: "none" }}>
+        By Sketch
+      </Link>
     </nav>
   );
 }
