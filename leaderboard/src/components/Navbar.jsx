@@ -21,6 +21,13 @@ function Navbar() {
       <Link to="/throughput" style={{ color: "white", textDecoration: "none" }}>
         Throughput
       </Link>
+
+      <Link
+        to="/visualization"
+        style={{ color: "white", textDecoration: "none" }}
+      >
+        Visualization
+      </Link>
     </nav>
   );
 }
