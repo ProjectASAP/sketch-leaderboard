@@ -5,6 +5,7 @@ import "./ResultTable.css";
 
 function ResultTable() {
   const [results, setResults] = useState([]);
+  const [sketchFilter, setSketchFilter] = useState("all");
 
   useEffect(() => {
     async function fetchData() {
@@ -15,11 +16,38 @@ function ResultTable() {
     fetchData();
   }, []);
 
+  const families = [...new Set(results.map((r) => r.sketch))].sort();
+  // Keep each row's original index so detail links stay correct when filtered.
+  const shown = results
+    .map((item, index) => ({ item, index }))
+    .filter(
+      ({ item }) => sketchFilter === "all" || item.sketch === sketchFilter,
+    );
+
   return (
     <div style={{ padding: "20px" }}>
       <h1>Benchmark Results</h1>
 
-      <p>Total Records: {results.length}</p>
+      <div style={{ margin: "12px 0" }}>
+        <label>
+          Sketch:{" "}
+          <select
+            value={sketchFilter}
+            onChange={(e) => setSketchFilter(e.target.value)}
+          >
+            <option value="all">All</option>
+            {families.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <p>
+        Showing {shown.length} of {results.length} records
+      </p>
 
       <table className="results-table">
         <thead>
@@ -39,7 +67,7 @@ function ResultTable() {
         </thead>
 
         <tbody>
-          {results.map((item, index) => (
+          {shown.map(({ item, index }) => (
             <tr key={index}>
               <td>{item.sketch}</td>
 
