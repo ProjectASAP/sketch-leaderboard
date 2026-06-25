@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { loadBenchmarkData } from "../utils/loadJson";
 import "./ResultTable.css";
-import DetailsModal from "../components/DetailsModal";
 
 function ResultTable() {
   const [results, setResults] = useState([]);
-  const [selectedRecord, setSelectedRecord] = useState(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -84,16 +83,12 @@ function ResultTable() {
               </td>
 
               <td>
-                <button onClick={() => setSelectedRecord(item)}>View</button>
+                <Link to={`/results/${index}`}>View</Link>
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <DetailsModal
-        data={selectedRecord}
-        onClose={() => setSelectedRecord(null)}
-      />
     </div>
   );
 }

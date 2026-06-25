@@ -1,0 +1,86 @@
+.detail-page {
+  padding: 20px;
+  max-width: 920px;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 16px;
+  color: #4f86c6;
+  text-decoration: none;
+}
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.detail-header h1 {
+  margin: 0 0 8px;
+}
+
+.badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.badge {
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 0.85rem;
+}
+
+.detail-card {
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 16px 0;
+}
+.detail-card h2 {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.stat {
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.stat-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #888;
+}
+.stat-value {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+.stat-sub {
+  font-size: 0.72rem;
+  color: #999;
+  margin-top: 2px;
+}
+
+.raw {
+  margin-top: 16px;
+}
+.raw summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.raw pre {
+  background: #1a1a1a;
+  color: #e6e6e6;
+  padding: 12px;
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 360px;
+}
