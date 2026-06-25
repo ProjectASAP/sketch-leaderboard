@@ -24,8 +24,15 @@ function queryMops(item) {
   return q ? q / 1e6 : null;
 }
 
-function ThroughputBar({ value, max, color }) {
-  const pct = max > 0 && value != null ? Math.max(2, (value / max) * 100) : 0;
+function ThroughputBar({ value, max, color, logScale }) {
+  let pct = 0;
+  if (max > 0 && value != null) {
+    if (logScale && value > 0 && max > 1) {
+      pct = Math.max(2, (Math.log(value) / Math.log(max)) * 100);
+    } else {
+      pct = Math.max(2, (value / max) * 100);
+    }
+  }
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
       <div
@@ -57,6 +64,7 @@ function Throughput() {
   const [records, setRecords] = useState([]);
   const [selectedSketch, setSelectedSketch] = useState("");
   const [selectedConfig, setSelectedConfig] = useState("");
+  const [logScale, setLogScale] = useState(false);
 
   useEffect(() => {
     loadBenchmarkData().then(setRecords);
@@ -152,11 +160,36 @@ function Throughput() {
         </label>
       )}
 
-      <p>
-        {sketch ? sketch.toUpperCase() : ""}
-        {config ? ` · ${config}` : ""} — {rows.length} run
-        {rows.length === 1 ? "" : "s"}
-      </p>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "8px",
+          marginBottom: "8px",
+        }}
+      >
+        <p style={{ margin: 0 }}>
+          {sketch ? sketch.toUpperCase() : ""}
+          {config ? ` · ${config}` : ""} — {rows.length} run
+          {rows.length === 1 ? "" : "s"}
+        </p>
+        <button
+          onClick={() => setLogScale((v) => !v)}
+          style={{
+            padding: "4px 12px",
+            borderRadius: "6px",
+            border: "1px solid #ccc",
+            cursor: "pointer",
+            background: logScale ? "#222" : "#fff",
+            color: logScale ? "#fff" : "#222",
+            fontSize: "0.85em",
+          }}
+        >
+          {logScale ? "Log scale" : "Linear scale"}
+        </button>
+      </div>
 
       <table className="results-table">
         <thead>
@@ -178,10 +211,16 @@ function Throughput() {
                   value={r.insert}
                   max={maxInsert}
                   color="#4f86c6"
+                  logScale={logScale}
                 />
               </td>
               <td>
-                <ThroughputBar value={r.query} max={maxQuery} color="#42b883" />
+                <ThroughputBar
+                  value={r.query}
+                  max={maxQuery}
+                  color="#42b883"
+                  logScale={logScale}
+                />
               </td>
             </tr>
           ))}
