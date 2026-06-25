@@ -373,12 +373,20 @@ function Visualization() {
               logScale={logScale}
             />
           )}
-          {hasAccuracy && (
+          {hasAccuracy && selectedWorkload === "all" && (
+            <div style={{ padding: "16px 20px", background: "#f5f5f5", borderRadius: "8px", border: "1px solid #e0e0e0" }}>
+              <strong>{accuracyLabel(sketch)}</strong>
+              <p style={{ margin: "6px 0 0", color: "#666", fontSize: "0.9em" }}>
+                Select a specific workload above to compare error rates — averaging across workloads with very different characteristics gives misleading results.
+              </p>
+            </div>
+          )}
+          {hasAccuracy && selectedWorkload !== "all" && (
             <StackedChart
               title={accuracyLabel(sketch)}
               data={byImpl}
               dataKeys={[{ key: "accuracy", name: "Error", color: "#e5c07b" }]}
-              yLabel="error"
+              yLabel="% relative error"
               lowerIsBetter
               logScale={logScale}
             />
