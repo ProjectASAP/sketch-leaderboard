@@ -53,15 +53,27 @@ function accuracyFor(item) {
 function accuracyLabel(sketch) {
   switch (sketch) {
     case "hll":
-      return "Relative error";
+      return "Relative Error";
     case "kll":
-      return "Mean rank error";
+      return "Mean Rank Error";
     case "cms":
     case "countsketch":
-      return "Relative error mean";
+      return "Relative Error Mean";
     default:
-      return "Accuracy";
+      return "Accuracy Error";
   }
+}
+
+function memoryUnit(maxKb) {
+  if (maxKb >= 1024 * 1024) return "GB";
+  if (maxKb >= 1024) return "MB";
+  return "KB";
+}
+
+function memoryDivisor(unit) {
+  if (unit === "GB") return 1024 * 1024;
+  if (unit === "MB") return 1024;
+  return 1;
 }
 
 const IMPL_COLORS = [
@@ -77,13 +89,13 @@ const IMPL_COLORS = [
   "#61afef",
 ];
 
-function MiniChart({ title, data, dataKeys, yLabel, lowerIsBetter, logScale }) {
+function StackedChart({ title, data, dataKeys, yLabel, lowerIsBetter, logScale }) {
   const scale = logScale ? "log" : "auto";
   const domain = logScale ? ["auto", "auto"] : [0, "auto"];
 
   return (
-    <div style={{ flex: 1, minWidth: "280px" }}>
-      <h3 style={{ marginBottom: "4px", fontSize: "1em" }}>
+    <div style={{ width: "100%" }}>
+      <h3 style={{ marginBottom: "8px", fontSize: "1.1em" }}>
         {title}
         {lowerIsBetter && (
           <span style={{ fontWeight: "normal", color: "#888", fontSize: "0.85em" }}>
@@ -91,33 +103,58 @@ function MiniChart({ title, data, dataKeys, yLabel, lowerIsBetter, logScale }) {
           </span>
         )}
       </h3>
-      <ResponsiveContainer width="100%" height={280}>
-        <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 60 }}>
+      <ResponsiveContainer width="100%" height={360}>
+        <BarChart
+          data={data}
+          margin={{ top: 10, right: 30, left: 70, bottom: 90 }}
+        >
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis
             dataKey="impl"
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 14, fontWeight: 500 }}
             angle={-35}
             textAnchor="end"
             interval={0}
+            label={{
+              value: "Implementation",
+              position: "insideBottom",
+              offset: -70,
+              style: { fontSize: 14, fill: "#333", fontWeight: 600 },
+            }}
           />
           <YAxis
             scale={scale}
             domain={domain}
             allowDataOverflow
-            tick={{ fontSize: 11 }}
+            tick={{ fontSize: 14, fontWeight: 500 }}
+            width={60}
             label={{
               value: yLabel,
               angle: -90,
               position: "insideLeft",
-              offset: 10,
-              style: { fontSize: 11, fill: "#555" },
+              offset: -50,
+              style: { fontSize: 14, fill: "#333", fontWeight: 600 },
             }}
           />
-          <Tooltip formatter={(v) => (v != null ? v : "—")} />
-          {dataKeys.length > 1 && <Legend verticalAlign="top" iconSize={10} />}
+          <Tooltip
+            formatter={(v, name) => [v != null ? v : "—", name]}
+            contentStyle={{ fontSize: "13px" }}
+          />
+          {dataKeys.length > 1 && (
+            <Legend
+              verticalAlign="top"
+              iconSize={12}
+              wrapperStyle={{ fontSize: "13px" }}
+            />
+          )}
           {dataKeys.map(({ key, color, name }, i) => (
-            <Bar key={key} dataKey={key} name={name} fill={color ?? IMPL_COLORS[i]} radius={[3, 3, 0, 0]} />
+            <Bar
+              key={key}
+              dataKey={key}
+              name={name}
+              fill={color ?? IMPL_COLORS[i]}
+              radius={[4, 4, 0, 0]}
+            />
           ))}
         </BarChart>
       </ResponsiveContainer>
@@ -185,12 +222,13 @@ function Visualization() {
     [records, sketch, config, selectedWorkload],
   );
 
-  // Aggregate by impl (average across matching records)
+  // Aggregate absolute means by impl
   const byImpl = useMemo(() => {
     const map = {};
     for (const r of filtered) {
       const key = r.impl;
-      if (!map[key]) map[key] = { impl: key, inserts: [], queries: [], mems: [], accs: [] };
+      if (!map[key])
+        map[key] = { impl: key, inserts: [], queries: [], mems: [], accs: [] };
       const ins = insertMops(r);
       const q = queryMops(r);
       const m = r.bench?.heap_allocated_kb;
@@ -203,22 +241,44 @@ function Visualization() {
     return Object.values(map)
       .map((d) => ({
         impl: d.impl,
-        insert: d.inserts.length ? +(d.inserts.reduce((a, b) => a + b, 0) / d.inserts.length).toFixed(3) : null,
-        query: d.queries.length ? +(d.queries.reduce((a, b) => a + b, 0) / d.queries.length).toFixed(3) : null,
-        memory: d.mems.length ? +(d.mems.reduce((a, b) => a + b, 0) / d.mems.length).toFixed(1) : null,
-        accuracy: d.accs.length ? +(d.accs.reduce((a, b) => a + b, 0) / d.accs.length).toFixed(4) : null,
+        insert: d.inserts.length
+          ? +(d.inserts.reduce((a, b) => a + b, 0) / d.inserts.length).toFixed(3)
+          : null,
+        query: d.queries.length
+          ? +(d.queries.reduce((a, b) => a + b, 0) / d.queries.length).toFixed(3)
+          : null,
+        memoryKb: d.mems.length
+          ? +(d.mems.reduce((a, b) => a + b, 0) / d.mems.length).toFixed(1)
+          : null,
+        accuracy: d.accs.length
+          ? +(d.accs.reduce((a, b) => a + b, 0) / d.accs.length).toFixed(4)
+          : null,
       }))
       .sort((a, b) => (b.query ?? 0) - (a.query ?? 0));
   }, [filtered]);
 
+  // Auto-scale memory unit based on max value
+  const unit = useMemo(() => {
+    const maxKb = Math.max(0, ...byImpl.map((r) => r.memoryKb ?? 0));
+    return memoryUnit(maxKb);
+  }, [byImpl]);
+
+  const memoryData = useMemo(() => {
+    const div = memoryDivisor(unit);
+    return byImpl.map((r) => ({
+      ...r,
+      memory: r.memoryKb != null ? +(r.memoryKb / div).toFixed(3) : null,
+    }));
+  }, [byImpl, unit]);
+
   const hasAccuracy = byImpl.some((r) => r.accuracy != null);
+  const hasMemory = byImpl.some((r) => r.memoryKb != null);
 
   return (
     <div style={{ padding: "20px" }}>
       <h1>Visualization</h1>
       <p>Multi-metric comparison across implementations.</p>
 
-      {/* Sketch family selector */}
       <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", margin: "16px 0" }}>
         {families.map((f) => (
           <button
@@ -244,7 +304,6 @@ function Visualization() {
         ))}
       </div>
 
-      {/* Workload + config filters + log scale toggle */}
       <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "center", marginBottom: "16px" }}>
         {workloads.length > 0 && (
           <label>
@@ -260,10 +319,7 @@ function Visualization() {
         {configs.length > 0 && (
           <label>
             Configuration:{" "}
-            <select
-              value={config}
-              onChange={(e) => setSelectedConfig(e.target.value)}
-            >
+            <select value={config} onChange={(e) => setSelectedConfig(e.target.value)}>
               {configs.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -286,7 +342,7 @@ function Visualization() {
         </button>
       </div>
 
-      <p style={{ color: "#555", fontSize: "0.9em", marginBottom: "20px" }}>
+      <p style={{ color: "#555", fontSize: "0.9em", marginBottom: "28px" }}>
         {sketch.toUpperCase()}
         {config !== "default" ? ` · ${config}` : ""}
         {selectedWorkload !== "all" ? ` · ${selectedWorkload}` : ""} —{" "}
@@ -297,8 +353,8 @@ function Visualization() {
       {byImpl.length === 0 ? (
         <p style={{ color: "#888" }}>No data for this selection.</p>
       ) : (
-        <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
-          <MiniChart
+        <div style={{ display: "flex", flexDirection: "column", gap: "48px" }}>
+          <StackedChart
             title="Throughput"
             data={byImpl}
             dataKeys={[
@@ -308,15 +364,17 @@ function Visualization() {
             yLabel="M items/s"
             logScale={logScale}
           />
-          <MiniChart
-            title="Memory (heap)"
-            data={byImpl}
-            dataKeys={[{ key: "memory", name: "Heap", color: "#e06c75" }]}
-            yLabel="KB"
-            logScale={logScale}
-          />
+          {hasMemory && (
+            <StackedChart
+              title="Memory (heap)"
+              data={memoryData}
+              dataKeys={[{ key: "memory", name: "Heap", color: "#e06c75" }]}
+              yLabel={unit}
+              logScale={logScale}
+            />
+          )}
           {hasAccuracy && (
-            <MiniChart
+            <StackedChart
               title={accuracyLabel(sketch)}
               data={byImpl}
               dataKeys={[{ key: "accuracy", name: "Error", color: "#e5c07b" }]}
