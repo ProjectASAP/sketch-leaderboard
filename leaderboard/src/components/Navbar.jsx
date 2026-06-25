@@ -22,7 +22,10 @@ function Navbar() {
         Throughput
       </Link>
 
-      <Link to="/visualization" style={{ color: "white", textDecoration: "none" }}>
+      <Link
+        to="/visualization"
+        style={{ color: "white", textDecoration: "none" }}
+      >
         Visualization
       </Link>
     </nav>

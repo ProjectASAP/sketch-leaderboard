@@ -89,7 +89,14 @@ const IMPL_COLORS = [
   "#61afef",
 ];
 
-function StackedChart({ title, data, dataKeys, yLabel, lowerIsBetter, logScale }) {
+function StackedChart({
+  title,
+  data,
+  dataKeys,
+  yLabel,
+  lowerIsBetter,
+  logScale,
+}) {
   const scale = logScale ? "log" : "auto";
   const domain = logScale ? ["auto", "auto"] : [0, "auto"];
 
@@ -98,8 +105,11 @@ function StackedChart({ title, data, dataKeys, yLabel, lowerIsBetter, logScale }
       <h3 style={{ marginBottom: "8px", fontSize: "1.1em" }}>
         {title}
         {lowerIsBetter && (
-          <span style={{ fontWeight: "normal", color: "#888", fontSize: "0.85em" }}>
-            {" "}(lower is better)
+          <span
+            style={{ fontWeight: "normal", color: "#888", fontSize: "0.85em" }}
+          >
+            {" "}
+            (lower is better)
           </span>
         )}
       </h3>
@@ -217,7 +227,8 @@ function Visualization() {
         (r) =>
           r.sketch === sketch &&
           formatConfig(r) === config &&
-          (selectedWorkload === "all" || r.workload?.shape === selectedWorkload),
+          (selectedWorkload === "all" ||
+            r.workload?.shape === selectedWorkload),
       ),
     [records, sketch, config, selectedWorkload],
   );
@@ -242,10 +253,14 @@ function Visualization() {
       .map((d) => ({
         impl: d.impl,
         insert: d.inserts.length
-          ? +(d.inserts.reduce((a, b) => a + b, 0) / d.inserts.length).toFixed(3)
+          ? +(d.inserts.reduce((a, b) => a + b, 0) / d.inserts.length).toFixed(
+              3,
+            )
           : null,
         query: d.queries.length
-          ? +(d.queries.reduce((a, b) => a + b, 0) / d.queries.length).toFixed(3)
+          ? +(d.queries.reduce((a, b) => a + b, 0) / d.queries.length).toFixed(
+              3,
+            )
           : null,
         memoryKb: d.mems.length
           ? +(d.mems.reduce((a, b) => a + b, 0) / d.mems.length).toFixed(1)
@@ -279,7 +294,14 @@ function Visualization() {
       <h1>Visualization</h1>
       <p>Multi-metric comparison across implementations.</p>
 
-      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", margin: "16px 0" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "10px",
+          flexWrap: "wrap",
+          margin: "16px 0",
+        }}
+      >
         {families.map((f) => (
           <button
             key={f}
@@ -304,14 +326,27 @@ function Visualization() {
         ))}
       </div>
 
-      <div style={{ display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "center", marginBottom: "16px" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "20px",
+          flexWrap: "wrap",
+          alignItems: "center",
+          marginBottom: "16px",
+        }}
+      >
         {workloads.length > 0 && (
           <label>
             Workload:{" "}
-            <select value={selectedWorkload} onChange={(e) => setSelectedWorkload(e.target.value)}>
+            <select
+              value={selectedWorkload}
+              onChange={(e) => setSelectedWorkload(e.target.value)}
+            >
               <option value="all">All</option>
               {workloads.map((w) => (
-                <option key={w} value={w}>{w}</option>
+                <option key={w} value={w}>
+                  {w}
+                </option>
               ))}
             </select>
           </label>
@@ -319,9 +354,14 @@ function Visualization() {
         {configs.length > 0 && (
           <label>
             Configuration:{" "}
-            <select value={config} onChange={(e) => setSelectedConfig(e.target.value)}>
+            <select
+              value={config}
+              onChange={(e) => setSelectedConfig(e.target.value)}
+            >
               {configs.map((c) => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c} value={c}>
+                  {c}
+                </option>
               ))}
             </select>
           </label>
@@ -347,7 +387,9 @@ function Visualization() {
         {config !== "default" ? ` · ${config}` : ""}
         {selectedWorkload !== "all" ? ` · ${selectedWorkload}` : ""} —{" "}
         {byImpl.length} implementation{byImpl.length === 1 ? "" : "s"}
-        {filtered.length !== byImpl.length ? `, ${filtered.length} records averaged` : ""}
+        {filtered.length !== byImpl.length
+          ? `, ${filtered.length} records averaged`
+          : ""}
       </p>
 
       {byImpl.length === 0 ? (
@@ -374,10 +416,21 @@ function Visualization() {
             />
           )}
           {hasAccuracy && selectedWorkload === "all" && (
-            <div style={{ padding: "16px 20px", background: "#f5f5f5", borderRadius: "8px", border: "1px solid #e0e0e0" }}>
+            <div
+              style={{
+                padding: "16px 20px",
+                background: "#f5f5f5",
+                borderRadius: "8px",
+                border: "1px solid #e0e0e0",
+              }}
+            >
               <strong>{accuracyLabel(sketch)}</strong>
-              <p style={{ margin: "6px 0 0", color: "#666", fontSize: "0.9em" }}>
-                Select a specific workload above to compare error rates — averaging across workloads with very different characteristics gives misleading results.
+              <p
+                style={{ margin: "6px 0 0", color: "#666", fontSize: "0.9em" }}
+              >
+                Select a specific workload above to compare error rates —
+                averaging across workloads with very different characteristics
+                gives misleading results.
               </p>
             </div>
           )}
