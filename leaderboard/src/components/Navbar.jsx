@@ -28,6 +28,10 @@ function Navbar() {
       >
         Visualization
       </Link>
+
+      <Link to="/decision" style={{ color: "white", textDecoration: "none" }}>
+        Decision Support
+      </Link>
     </nav>
   );
 }

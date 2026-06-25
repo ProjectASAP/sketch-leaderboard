@@ -5,6 +5,7 @@ import ResultTable from "./pages/ResultTable";
 import ResultDetails from "./pages/ResultDetails";
 import Throughput from "./pages/Throughput";
 import Visualization from "./pages/Visualization";
+import DecisionSupport from "./pages/DecisionSupport";
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <Route path="/results/:index" element={<ResultDetails />} />
         <Route path="/throughput" element={<Throughput />} />
         <Route path="/visualization" element={<Visualization />} />
+        <Route path="/decision" element={<DecisionSupport />} />
       </Routes>
     </>
   );
