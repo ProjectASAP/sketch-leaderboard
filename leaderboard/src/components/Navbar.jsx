@@ -17,6 +17,13 @@ function Navbar() {
       <Link to="/results" style={{ color: "white", textDecoration: "none" }}>
         Results
       </Link>
+
+      <Link
+        to="/accuracy-vs-cost"
+        style={{ color: "white", textDecoration: "none" }}
+      >
+        Accuracy vs Cost
+      </Link>
     </nav>
   );
 }
