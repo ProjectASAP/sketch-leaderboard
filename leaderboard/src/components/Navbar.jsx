@@ -24,6 +24,17 @@ function Navbar() {
       >
         Accuracy vs Cost
       </Link>
+
+      <Link to="/throughput" style={{ color: "white", textDecoration: "none" }}>
+        Throughput
+      </Link>
+
+      <Link
+        to="/visualization"
+        style={{ color: "white", textDecoration: "none" }}
+      >
+        Visualization
+      </Link>
     </nav>
   );
 }
