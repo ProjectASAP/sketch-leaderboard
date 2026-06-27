@@ -16,10 +16,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/results" element={<ResultTable />} />
         <Route path="/results/:index" element={<ResultDetails />} />
-        <Route
-          path="/accuracy-vs-cost"
-          element={<AccuracyVsCost />}
-        />
+        <Route path="/accuracy-vs-cost" element={<AccuracyVsCost />} />
         <Route path="/throughput" element={<Throughput />} />
         <Route path="/visualization" element={<Visualization />} />
       </Routes>

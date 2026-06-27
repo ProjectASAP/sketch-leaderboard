@@ -73,15 +73,10 @@ function AccuracyVsCost() {
     })
     .filter(Boolean);
 
-  const sketches = [
-    "all",
-    ...new Set(results.map((item) => item.sketch)),
-  ];
+  const sketches = ["all", ...new Set(results.map((item) => item.sketch))];
 
   const filteredData = chartData.filter(
-    (item) =>
-      selectedSketch === "all" ||
-      item.sketch === selectedSketch
+    (item) => selectedSketch === "all" || item.sketch === selectedSketch,
   );
 
   return (
@@ -164,14 +159,11 @@ function AccuracyVsCost() {
 
             <Tooltip
               formatter={(value, name) => [
-                typeof value === "number"
-                  ? value.toFixed(2)
-                  : value,
+                typeof value === "number" ? value.toFixed(2) : value,
                 name,
               ]}
               content={({ active, payload }) => {
-                if (!active || !payload || payload.length === 0)
-                  return null;
+                if (!active || !payload || payload.length === 0) return null;
 
                 const point = payload[0].payload;
 
@@ -204,18 +196,14 @@ function AccuracyVsCost() {
                     </div>
 
                     <div>
-                      <strong>Accuracy:</strong>{" "}
-                      {point.y.toFixed(2)}%
+                      <strong>Accuracy:</strong> {point.y.toFixed(2)}%
                     </div>
                   </div>
                 );
               }}
             />
 
-            <Scatter
-              data={filteredData}
-              fill="#1976d2"
-            />
+            <Scatter data={filteredData} fill="#1976d2" />
           </ScatterChart>
         </ResponsiveContainer>
       </div>
