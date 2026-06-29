@@ -6,6 +6,7 @@ on:
     paths: ["leaderboard/**"]
   pull_request:
     paths: ["leaderboard/**"]
+  workflow_dispatch:
 
 jobs:
   lint-and-build:
@@ -26,3 +27,31 @@ jobs:
       - run: npm run lint
       - run: npm run format:check
       - run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: leaderboard-dist
+          path: leaderboard/dist/
+
+  deploy:
+    needs: lint-and-build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: leaderboard-dist
+          path: dist/
+
+      - name: Push to Pages repo
+        run: |
+          git clone https://x-access-token:${{ secrets.PAGES_DEPLOY_TOKEN }}@github.com/ProjectASAP/ProjectASAP.github.io.git pages
+          rm -rf pages/sketch-leaderboard
+          cp -r dist pages/sketch-leaderboard
+          cd pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add sketch-leaderboard/
+          git diff --staged --quiet || git commit -m "chore: update sketch-leaderboard build"
+          git push
