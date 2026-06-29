@@ -6,6 +6,7 @@ import AccuracyVsCost from "./pages/AccuracyVsCost";
 import ResultDetails from "./pages/ResultDetails";
 import Throughput from "./pages/Throughput";
 import Visualization from "./pages/Visualization";
+import DecisionSupport from "./pages/DecisionSupport";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
         <Route path="/accuracy-vs-cost" element={<AccuracyVsCost />} />
         <Route path="/throughput" element={<Throughput />} />
         <Route path="/visualization" element={<Visualization />} />
+        <Route path="/decision" element={<DecisionSupport />} />
       </Routes>
     </>
   );
