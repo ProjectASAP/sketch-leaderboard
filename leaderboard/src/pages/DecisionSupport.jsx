@@ -246,7 +246,9 @@ function DecisionSupport() {
       .map((c) => {
         const missing = [];
         const sSpeed =
-          c.query != null ? norm(c.query, minQ, maxQ) : (missing.push("throughput"), 0);
+          c.query != null
+            ? norm(c.query, minQ, maxQ)
+            : (missing.push("throughput"), 0);
         const sMem =
           c.memoryKb != null
             ? 1 - norm(c.memoryKb, minM, maxM)
