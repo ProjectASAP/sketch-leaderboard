@@ -43,7 +43,7 @@ function avg(arr) {
 }
 
 function fmtMemory(kb) {
-  if (kb == null) return "—";
+  if (kb == null) return "NA";
   if (kb >= 1024 * 1024) return `${(kb / 1024 / 1024).toFixed(1)} GB`;
   if (kb >= 1024) return `${(kb / 1024).toFixed(1)} MB`;
   return `${kb.toFixed(0)} KB`;
@@ -244,10 +244,21 @@ function DecisionSupport() {
 
     return [...passing]
       .map((c) => {
-        const sSpeed = c.query != null ? norm(c.query, minQ, maxQ) : 0.5;
+        const missing = [];
+        const sSpeed =
+          c.query != null ? norm(c.query, minQ, maxQ) : (missing.push("throughput"), 0);
         const sMem =
-          c.memoryKb != null ? 1 - norm(c.memoryKb, minM, maxM) : 0.5;
-        const sAcc = c.error != null ? 1 - norm(c.error, minE, maxE) : 0.5;
+          c.memoryKb != null
+            ? 1 - norm(c.memoryKb, minM, maxM)
+            : (missing.push("memory"), 0);
+        const sAcc =
+          c.error != null
+            ? 1 - norm(c.error, minE, maxE)
+            : (missing.push("error"), 0);
+        if (missing.length > 0)
+          console.warn(
+            `[DecisionSupport] ${c.sketch}/${c.impl}/${c.config}: missing ${missing.join(", ")} — scored as 0`,
+          );
         const score =
           (speedPri * sSpeed + memoryPri * sMem + accuracyPri * sAcc) / total;
         return { ...c, score };
@@ -490,8 +501,8 @@ function DecisionSupport() {
                     {r.config}
                   </td>
                   <td>{fmtMemory(r.memoryKb)}</td>
-                  <td>{r.query != null ? `${r.query} M/s` : "—"}</td>
-                  <td>{r.error != null ? `${r.error}%` : "—"}</td>
+                  <td>{r.query != null ? `${r.query} M/s` : "NA"}</td>
+                  <td>{r.error != null ? `${r.error}%` : "NA"}</td>
                   <td>
                     <ScoreBar score={r.score} />
                   </td>
