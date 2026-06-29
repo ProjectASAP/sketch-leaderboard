@@ -18,6 +18,13 @@ function Navbar() {
         Results
       </Link>
 
+      <Link
+        to="/accuracy-vs-cost"
+        style={{ color: "white", textDecoration: "none" }}
+      >
+        Accuracy vs Cost
+      </Link>
+
       <Link to="/throughput" style={{ color: "white", textDecoration: "none" }}>
         Throughput
       </Link>
