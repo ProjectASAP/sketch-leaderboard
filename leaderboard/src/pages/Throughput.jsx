@@ -10,17 +10,13 @@ function formatConfig(item) {
     .join(", ");
 }
 
-// Insertion throughput isn't stored directly; derive it from the workload
-// size and mean wall-clock time (items/sec -> M items/sec).
 function insertMops(item) {
-  const wall = item.bench?.wall_time_ms?.mean;
-  const size = item.workload?.size;
-  if (!wall || !size) return null;
-  return size / (wall / 1000) / 1e6;
+  const ins = item.insert_throughput_items_per_sec?.mean;
+  return ins ? ins / 1e6 : null;
 }
 
 function queryMops(item) {
-  const q = item.bench?.query_throughput_items_per_sec?.mean;
+  const q = item.query_throughput_items_per_sec?.mean;
   return q ? q / 1e6 : null;
 }
 
