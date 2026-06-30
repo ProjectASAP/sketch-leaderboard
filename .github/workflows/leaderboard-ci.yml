@@ -6,6 +6,7 @@ on:
     paths: ["leaderboard/**"]
   pull_request:
     paths: ["leaderboard/**"]
+  workflow_dispatch:
 
 jobs:
   lint-and-build:
@@ -23,6 +24,61 @@ jobs:
           cache-dependency-path: leaderboard/package-lock.json
 
       - run: npm ci
+
+      - name: Validate data — no duplicate keys
+        run: |
+          python3 - <<'EOF'
+          import json, sys
+          from collections import defaultdict
+          path = "public/data/all.jsonl"
+          counts = defaultdict(int)
+          with open(path) as f:
+              for line in f:
+                  r = json.loads(line)
+                  k = json.dumps([r["sketch"], r["impl"], r.get("language"), r.get("sketch_config"), r["workload"], r["mode"]], sort_keys=True)
+                  counts[k] += 1
+          dupes = {k: v for k, v in counts.items() if v > 1}
+          if dupes:
+              print(f"FAIL: {len(dupes)} duplicate key(s) in {path}:")
+              for k in list(dupes)[:5]:
+                  print(f"  {k}")
+              sys.exit(1)
+          print(f"OK: {len(counts)} unique keys in {path}")
+          EOF
+
       - run: npm run lint
       - run: npm run format:check
       - run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: leaderboard-dist
+          path: leaderboard/dist/
+
+  deploy:
+    needs: lint-and-build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: leaderboard-dist
+          path: dist/
+
+      - name: Push to Pages repo
+        env:
+          SSH_KEY: ${{ secrets.PAGES_DEPLOY_KEY }}
+        run: |
+          install -m 600 /dev/null /tmp/deploy_key
+          echo "$SSH_KEY" > /tmp/deploy_key
+          GIT_SSH_COMMAND="ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" \
+            git clone git@github.com:ProjectASAP/ProjectASAP.github.io.git pages
+          rm -rf pages/sketch-leaderboard
+          cp -r dist pages/sketch-leaderboard
+          cd pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add sketch-leaderboard/
+          git diff --staged --quiet || GIT_SSH_COMMAND="ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" git commit -m "chore: update sketch-leaderboard build"
+          GIT_SSH_COMMAND="ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no" git push
