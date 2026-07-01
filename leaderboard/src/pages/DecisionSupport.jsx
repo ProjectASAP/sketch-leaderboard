@@ -11,13 +11,13 @@ function formatConfig(item) {
 }
 
 function queryMops(item) {
-  const q = item.bench?.query_throughput_items_per_sec?.mean;
+  const q = item.query_throughput_items_per_sec?.mean;
   return q ? +(q / 1e6).toFixed(3) : null;
 }
 
 // Normalize all error values to % for consistent comparison
 function errorPct(item) {
-  const acc = item.bench?.accuracy;
+  const acc = item.accuracy;
   if (!acc) return null;
   switch (item.sketch) {
     case "hll":
@@ -181,7 +181,7 @@ function DecisionSupport() {
           errs: [],
         };
       const q = queryMops(r);
-      const m = r.bench?.heap_allocated_kb;
+      const m = r.insert_heap_allocated_kb;
       const e = errorPct(r);
       if (q != null) map[key].queries.push(q);
       if (m != null) map[key].mems.push(m);

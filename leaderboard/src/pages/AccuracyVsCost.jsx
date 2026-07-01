@@ -30,11 +30,11 @@ function AccuracyVsCost() {
   function getCostValue(item, metric) {
     switch (metric) {
       case "memory":
-        return item.bench?.memory_bytes ?? null;
+        return item.memory_bytes ?? null;
 
       case "query":
-        return item.bench?.query_throughput_items_per_sec?.mean
-          ? item.bench.query_throughput_items_per_sec.mean / 1000000
+        return item.query_throughput_items_per_sec?.mean
+          ? item.query_throughput_items_per_sec.mean / 1000000
           : null;
 
       default:
@@ -58,7 +58,7 @@ function AccuracyVsCost() {
   const chartData = results
     .map((item) => {
       const cost = getCostValue(item, selectedMetric);
-      const error = item.bench?.accuracy?.relative_error_mean;
+      const error = item.accuracy?.relative_error_mean;
 
       if (cost == null || error == null) return null;
 
