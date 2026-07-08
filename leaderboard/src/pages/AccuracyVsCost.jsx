@@ -130,10 +130,7 @@ function AccuracyVsCost() {
   const filteredData =
     selectedSketches.length === 0
       ? []
-      : chartData.filter((item) =>
-        selectedSketches.includes(item.sketch),
-      );
-
+      : chartData.filter((item) => selectedSketches.includes(item.sketch));
 
   function toggleSketch(sketch) {
     const sketchGroup =
@@ -145,9 +142,7 @@ function AccuracyVsCost() {
 
     // Remove if already selected
     if (selectedSketches.includes(sketch)) {
-      setSelectedSketches(
-        selectedSketches.filter((s) => s !== sketch)
-      );
+      setSelectedSketches(selectedSketches.filter((s) => s !== sketch));
       return;
     }
 
@@ -160,7 +155,7 @@ function AccuracyVsCost() {
     // Find current group
     const currentGroup =
       selectedSketches.includes("cms") ||
-        selectedSketches.includes("countsketch")
+      selectedSketches.includes("countsketch")
         ? "frequency"
         : selectedSketches.includes("hll")
           ? "cardinality"
@@ -168,13 +163,10 @@ function AccuracyVsCost() {
 
     // Allow only sketches from the same statistic
     if (currentGroup === sketchGroup) {
-      setSelectedSketches([
-        ...selectedSketches,
-        sketch,
-      ]);
+      setSelectedSketches([...selectedSketches, sketch]);
     } else {
       setMessage(
-        "These sketches estimate different statistics and cannot be compared together."
+        "These sketches estimate different statistics and cannot be compared together.",
       );
 
       setTimeout(() => {
@@ -224,11 +216,7 @@ function AccuracyVsCost() {
         </div>
       </div>
 
-      {message && (
-        <div className="warning-message">
-          {message}
-        </div>
-      )}
+      {message && <div className="warning-message">{message}</div>}
       <hr />
 
       <div className="chart-container">
