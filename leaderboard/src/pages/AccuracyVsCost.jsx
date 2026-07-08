@@ -16,7 +16,8 @@ import "./AccuracyVsCost.css";
 function AccuracyVsCost() {
   const [results, setResults] = useState([]);
   const [selectedMetric, setSelectedMetric] = useState("memory");
-  const [selectedSketch, setSelectedSketch] = useState("all");
+  const [selectedSketches, setSelectedSketches] = useState([]);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function fetchData() {
@@ -73,11 +74,63 @@ function AccuracyVsCost() {
     })
     .filter(Boolean);
 
-  const sketches = ["all", ...new Set(results.map((item) => item.sketch))];
+  const sketches = [...new Set(results.map((item) => item.sketch))];
 
-  const filteredData = chartData.filter(
-    (item) => selectedSketch === "all" || item.sketch === selectedSketch,
-  );
+  const filteredData =
+    selectedSketches.length === 0
+      ? chartData
+      : chartData.filter((item) =>
+        selectedSketches.includes(item.sketch),
+      );
+
+
+  function toggleSketch(sketch) {
+    const sketchGroup =
+      sketch === "cms" || sketch === "countsketch"
+        ? "frequency"
+        : sketch === "hll"
+          ? "cardinality"
+          : "quantile";
+
+    // Remove if already selected
+    if (selectedSketches.includes(sketch)) {
+      setSelectedSketches(
+        selectedSketches.filter((s) => s !== sketch)
+      );
+      return;
+    }
+
+    // No sketches selected
+    if (selectedSketches.length === 0) {
+      setSelectedSketches([sketch]);
+      return;
+    }
+
+    // Find current group
+    const currentGroup =
+      selectedSketches.includes("cms") ||
+        selectedSketches.includes("countsketch")
+        ? "frequency"
+        : selectedSketches.includes("hll")
+          ? "cardinality"
+          : "quantile";
+
+    // Allow only sketches from the same statistic
+    if (currentGroup === sketchGroup) {
+      setSelectedSketches([
+        ...selectedSketches,
+        sketch,
+      ]);
+    } else {
+      setMessage(
+        "These sketches estimate different statistics and cannot be compared together."
+      );
+
+      setTimeout(() => {
+        setMessage("");
+      }, 3000);
+    }
+  }
 
   return (
     <div className="accuracy-container">
@@ -103,23 +156,27 @@ function AccuracyVsCost() {
           <option value="query">Query Throughput</option>
         </select>
 
-        <label style={{ marginLeft: "20px" }}>
-          <strong>Sketch:</strong>
-        </label>
+        <div className="sketch-filter">
+          <strong>Sketches:</strong>
 
-        <select
-          className="metric-select"
-          value={selectedSketch}
-          onChange={(e) => setSelectedSketch(e.target.value)}
-        >
           {sketches.map((sketch) => (
-            <option key={sketch} value={sketch}>
+            <label key={sketch} className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={selectedSketches.includes(sketch)}
+                onChange={() => toggleSketch(sketch)}
+              />
               {sketch.toUpperCase()}
-            </option>
+            </label>
           ))}
-        </select>
+        </div>
       </div>
 
+      {message && (
+        <div className="warning-message">
+          {message}
+        </div>
+      )}
       <hr />
 
       <div className="chart-container">
@@ -220,10 +277,10 @@ function AccuracyVsCost() {
         <p>Current Cost Metric: {getXAxisLabel(selectedMetric)}</p>
 
         <p>
-          Selected Sketch:{" "}
-          {selectedSketch === "all"
-            ? "All Sketches"
-            : selectedSketch.toUpperCase()}
+          Selected Sketches:{" "}
+          {selectedSketches.length === 0
+            ? "None"
+            : selectedSketches.join(", ").toUpperCase()}
         </p>
       </div>
     </div>
