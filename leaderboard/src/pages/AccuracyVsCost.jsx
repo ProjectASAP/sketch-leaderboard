@@ -43,6 +43,7 @@ function AccuracyVsCost() {
     }
   }
 
+  // X-axis label based on the selected metric
   function getXAxisLabel(metric) {
     switch (metric) {
       case "memory":
@@ -56,16 +57,66 @@ function AccuracyVsCost() {
     }
   }
 
+  // Y-axis label and formatter based on the selected sketches
+  function getYAxisConfig() {
+    if (
+      selectedSketches.includes("cms") ||
+      selectedSketches.includes("countsketch")
+    ) {
+      return {
+        label: "Accuracy (%)",
+        formatter: (error) => Math.max(0, 100 - error),
+      };
+    }
+
+    if (selectedSketches.includes("hll")) {
+      return {
+        label: "Relative Error",
+        formatter: (error) => error,
+      };
+    }
+
+    if (selectedSketches.includes("kll")) {
+      return {
+        label: "Mean Rank Error",
+        formatter: (error) => error,
+      };
+    }
+
+    return {
+      label: "Value",
+      formatter: (error) => error,
+    };
+  }
+
+  function getAccuracyValue(item) {
+    switch (item.sketch) {
+      case "cms":
+      case "countsketch":
+        return item.accuracy?.relative_error_mean ?? null;
+
+      case "hll":
+        return item.accuracy?.relative_error ?? null;
+
+      case "kll":
+        return item.accuracy?.mean_rank_err ?? null;
+
+      default:
+        return null;
+    }
+  }
+
   const chartData = results
     .map((item) => {
       const cost = getCostValue(item, selectedMetric);
-      const error = item.accuracy?.relative_error_mean;
+      const error = getAccuracyValue(item);
+      const yAxis = getYAxisConfig();
 
       if (cost == null || error == null) return null;
 
       return {
         x: cost,
-        y: Math.max(0, 100 - error),
+        y: yAxis.formatter(error),
 
         sketch: item.sketch,
         implementation: item.impl,
@@ -78,7 +129,7 @@ function AccuracyVsCost() {
 
   const filteredData =
     selectedSketches.length === 0
-      ? chartData
+      ? []
       : chartData.filter((item) =>
         selectedSketches.includes(item.sketch),
       );
@@ -132,6 +183,7 @@ function AccuracyVsCost() {
     }
   }
 
+  const yAxis = getYAxisConfig();
   return (
     <div className="accuracy-container">
       <h1>Accuracy vs Cost Tradeoff</h1>
@@ -205,10 +257,10 @@ function AccuracyVsCost() {
             <YAxis
               type="number"
               dataKey="y"
-              name="Accuracy (%)"
-              domain={[0, 100]}
+              name={yAxis.label}
+              domain={["auto", "auto"]}
               label={{
-                value: "Accuracy (%)",
+                value: yAxis.label,
                 angle: -90,
                 position: "insideLeft",
               }}
@@ -253,7 +305,7 @@ function AccuracyVsCost() {
                     </div>
 
                     <div>
-                      <strong>Accuracy:</strong> {point.y.toFixed(2)}%
+                      <strong>{yAxis.label}:</strong> {point.y.toFixed(4)}
                     </div>
                   </div>
                 );
