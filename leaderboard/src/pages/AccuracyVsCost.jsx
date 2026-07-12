@@ -9,6 +9,7 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 
 import "./AccuracyVsCost.css";
@@ -22,6 +23,8 @@ function AccuracyVsCost() {
   useEffect(() => {
     async function fetchData() {
       const data = await loadBenchmarkData();
+      console.log("Implementations:");
+      console.log([...new Set(data.map((item) => item.impl))]);
       setResults(data);
     }
 
@@ -132,6 +135,16 @@ function AccuracyVsCost() {
       ? []
       : chartData.filter((item) => selectedSketches.includes(item.sketch));
 
+  const groupedData = {};
+
+  filteredData.forEach((item) => {
+    if (!groupedData[item.implementation]) {
+      groupedData[item.implementation] = [];
+    }
+
+    groupedData[item.implementation].push(item);
+  });
+
   function toggleSketch(sketch) {
     const sketchGroup =
       sketch === "cms" || sketch === "countsketch"
@@ -174,6 +187,19 @@ function AccuracyVsCost() {
       }, 3000);
     }
   }
+
+  const implementationColors = {
+    oxide: "#1f77b4",
+    datasketches: "#ff7f0e",
+    exact: "#2ca02c",
+    polars: "#d62728",
+    lib: "#9467bd",
+    "lib-vector2d-fast": "#8c564b",
+    "lib-vector2d-regular": "#e377c2",
+    "lib-fastpath-parallel": "#7f7f7f",
+    "lib-fixedmatrix-fast": "#bcbd22",
+    "lib-hip": "#17becf",
+  };
 
   const yAxis = getYAxisConfig();
   return (
@@ -300,7 +326,16 @@ function AccuracyVsCost() {
               }}
             />
 
-            <Scatter data={filteredData} fill="#1976d2" />
+            <Legend verticalAlign="top" align="center" height={36} />
+
+            {Object.entries(groupedData).map(([impl, data]) => (
+              <Scatter
+                key={impl}
+                name={impl}
+                data={data}
+                fill={implementationColors[impl] || "#8884d8"}
+              />
+            ))}
           </ScatterChart>
         </ResponsiveContainer>
       </div>
