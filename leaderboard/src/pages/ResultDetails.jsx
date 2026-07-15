@@ -66,9 +66,9 @@ function ResultDetails() {
 
   const insert = insertMops(item);
   const query = queryMops(item);
-  const qStddev = item.bench?.query_throughput_items_per_sec?.stddev;
-  const wall = item.bench?.wall_time_ms;
-  const cpu = item.bench?.cpu_time_ms;
+  const qStddev = item.query_throughput_items_per_sec?.stddev;
+  const wall = item.insert_wall_time_ms;
+  const cpu = item.insert_cpu_time_ms;
   const w = item.workload ?? {};
   const accs = accuracyRows(item);
 
@@ -93,7 +93,7 @@ function ResultDetails() {
         <Stat
           label="Insert throughput"
           value={insert != null ? `${insert.toFixed(2)} M/s` : "—"}
-          sub="derived: size ÷ wall time"
+          sub="mean of runs"
         />
         <Stat
           label="Query throughput"
@@ -106,7 +106,7 @@ function ResultDetails() {
         />
       </Card>
 
-      <Card title="Timing">
+      <Card title="Timing (insert)">
         <Stat
           label="Wall time"
           value={wall?.mean != null ? `${wall.mean.toFixed(2)} ms` : "—"}
@@ -130,17 +130,17 @@ function ResultDetails() {
         />
       </Card>
 
-      <Card title="Memory">
+      <Card title="Memory (insert)">
         <Stat
           label="Declared footprint"
-          value={fmtMemory(item.bench?.memory_bytes)}
+          value={fmtMemory(item.memory_bytes)}
           sub="sketch's own size"
         />
         <Stat
           label="Heap in-use"
           value={
-            item.bench?.heap_allocated_kb != null
-              ? fmtMemory(item.bench.heap_allocated_kb * 1024)
+            item.insert_heap_allocated_kb != null
+              ? fmtMemory(item.insert_heap_allocated_kb * 1024)
               : "—"
           }
           sub="jemalloc at run end"
@@ -148,8 +148,8 @@ function ResultDetails() {
         <Stat
           label="RSS peak"
           value={
-            item.bench?.rss_peak_kb != null
-              ? fmtMemory(item.bench.rss_peak_kb * 1024)
+            item.insert_rss_peak_kb != null
+              ? fmtMemory(item.insert_rss_peak_kb * 1024)
               : "—"
           }
           sub="process high-water mark"

@@ -59,7 +59,7 @@ function ResultTable() {
             <th>Size</th>
             <th>Cardinality</th>
             <th>Memory</th>
-            <th>Wall Time (ms)</th>
+            <th>Insert Wall Time (ms)</th>
             <th>Query Throughput</th>
             <th>Accuracy (%)</th>
             <th>Details</th>
@@ -82,20 +82,20 @@ function ResultTable() {
               <td>{item.workload?.cardinality?.toLocaleString() ?? "-"}</td>
 
               <td>
-                {item.bench?.memory_bytes
-                  ? `${(item.bench.memory_bytes / 1024).toFixed(1)} KB`
+                {item.memory_bytes
+                  ? `${(item.memory_bytes / 1024).toFixed(1)} KB`
                   : "-"}
               </td>
 
               <td>
-                {item.bench?.wall_time_ms?.mean
-                  ? item.bench.wall_time_ms.mean.toFixed(2)
+                {item.insert_wall_time_ms?.mean
+                  ? item.insert_wall_time_ms.mean.toFixed(2)
                   : "-"}
               </td>
 
               <td>
-                {item.bench?.query_throughput_items_per_sec?.mean
-                  ? item.bench.query_throughput_items_per_sec.mean.toLocaleString(
+                {item.query_throughput_items_per_sec?.mean
+                  ? item.query_throughput_items_per_sec.mean.toLocaleString(
                       undefined,
                       {
                         maximumFractionDigits: 0,
@@ -105,8 +105,8 @@ function ResultTable() {
               </td>
 
               <td>
-                {item.bench?.accuracy?.relative_error_mean
-                  ? `${item.bench.accuracy.relative_error_mean.toFixed(2)}%`
+                {item.accuracy?.relative_error_mean
+                  ? `${item.accuracy.relative_error_mean.toFixed(2)}%`
                   : "-"}
               </td>
 

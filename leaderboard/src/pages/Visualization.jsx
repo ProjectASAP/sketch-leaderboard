@@ -21,19 +21,17 @@ function formatConfig(item) {
 }
 
 function insertMops(item) {
-  const wall = item.bench?.wall_time_ms?.mean;
-  const size = item.workload?.size;
-  if (!wall || !size) return null;
-  return +(size / (wall / 1000) / 1e6).toFixed(3);
+  const ins = item.insert_throughput_items_per_sec?.mean;
+  return ins ? +(ins / 1e6).toFixed(3) : null;
 }
 
 function queryMops(item) {
-  const q = item.bench?.query_throughput_items_per_sec?.mean;
+  const q = item.query_throughput_items_per_sec?.mean;
   return q ? +(q / 1e6).toFixed(3) : null;
 }
 
 function accuracyFor(item) {
-  const acc = item.bench?.accuracy;
+  const acc = item.accuracy;
   if (!acc) return null;
   switch (item.sketch) {
     case "hll":
@@ -242,7 +240,7 @@ function Visualization() {
         map[key] = { impl: key, inserts: [], queries: [], mems: [], accs: [] };
       const ins = insertMops(r);
       const q = queryMops(r);
-      const m = r.bench?.heap_allocated_kb;
+      const m = r.insert_heap_allocated_kb;
       const a = accuracyFor(r);
       if (ins != null) map[key].inserts.push(ins);
       if (q != null) map[key].queries.push(q);

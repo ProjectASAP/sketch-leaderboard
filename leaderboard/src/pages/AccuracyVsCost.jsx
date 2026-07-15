@@ -9,6 +9,7 @@ import {
   YAxis,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from "recharts";
 
 import "./AccuracyVsCost.css";
@@ -16,11 +17,14 @@ import "./AccuracyVsCost.css";
 function AccuracyVsCost() {
   const [results, setResults] = useState([]);
   const [selectedMetric, setSelectedMetric] = useState("memory");
-  const [selectedSketch, setSelectedSketch] = useState("all");
+  const [selectedSketches, setSelectedSketches] = useState([]);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function fetchData() {
       const data = await loadBenchmarkData();
+      console.log("Implementations:");
+      console.log([...new Set(data.map((item) => item.impl))]);
       setResults(data);
     }
 
@@ -30,11 +34,11 @@ function AccuracyVsCost() {
   function getCostValue(item, metric) {
     switch (metric) {
       case "memory":
-        return item.bench?.memory_bytes ?? null;
+        return item.memory_bytes ?? null;
 
       case "query":
-        return item.bench?.query_throughput_items_per_sec?.mean
-          ? item.bench.query_throughput_items_per_sec.mean / 1000000
+        return item.query_throughput_items_per_sec?.mean
+          ? item.query_throughput_items_per_sec.mean / 1000000
           : null;
 
       default:
@@ -42,6 +46,7 @@ function AccuracyVsCost() {
     }
   }
 
+  // X-axis label based on the selected metric
   function getXAxisLabel(metric) {
     switch (metric) {
       case "memory":
@@ -55,16 +60,66 @@ function AccuracyVsCost() {
     }
   }
 
+  // Y-axis label and formatter based on the selected sketches
+  function getYAxisConfig() {
+    if (
+      selectedSketches.includes("cms") ||
+      selectedSketches.includes("countsketch")
+    ) {
+      return {
+        label: "Accuracy (%)",
+        formatter: (error) => Math.max(0, 100 - error),
+      };
+    }
+
+    if (selectedSketches.includes("hll")) {
+      return {
+        label: "Relative Error",
+        formatter: (error) => error,
+      };
+    }
+
+    if (selectedSketches.includes("kll")) {
+      return {
+        label: "Mean Rank Error",
+        formatter: (error) => error,
+      };
+    }
+
+    return {
+      label: "Value",
+      formatter: (error) => error,
+    };
+  }
+
+  function getAccuracyValue(item) {
+    switch (item.sketch) {
+      case "cms":
+      case "countsketch":
+        return item.accuracy?.relative_error_mean ?? null;
+
+      case "hll":
+        return item.accuracy?.relative_error ?? null;
+
+      case "kll":
+        return item.accuracy?.mean_rank_err ?? null;
+
+      default:
+        return null;
+    }
+  }
+
   const chartData = results
     .map((item) => {
       const cost = getCostValue(item, selectedMetric);
-      const error = item.bench?.accuracy?.relative_error_mean;
+      const error = getAccuracyValue(item);
+      const yAxis = getYAxisConfig();
 
       if (cost == null || error == null) return null;
 
       return {
         x: cost,
-        y: Math.max(0, 100 - error),
+        y: yAxis.formatter(error),
 
         sketch: item.sketch,
         implementation: item.impl,
@@ -73,12 +128,80 @@ function AccuracyVsCost() {
     })
     .filter(Boolean);
 
-  const sketches = ["all", ...new Set(results.map((item) => item.sketch))];
+  const sketches = [...new Set(results.map((item) => item.sketch))];
 
-  const filteredData = chartData.filter(
-    (item) => selectedSketch === "all" || item.sketch === selectedSketch,
-  );
+  const filteredData =
+    selectedSketches.length === 0
+      ? []
+      : chartData.filter((item) => selectedSketches.includes(item.sketch));
 
+  const groupedData = {};
+
+  filteredData.forEach((item) => {
+    if (!groupedData[item.implementation]) {
+      groupedData[item.implementation] = [];
+    }
+
+    groupedData[item.implementation].push(item);
+  });
+
+  function toggleSketch(sketch) {
+    const sketchGroup =
+      sketch === "cms" || sketch === "countsketch"
+        ? "frequency"
+        : sketch === "hll"
+          ? "cardinality"
+          : "quantile";
+
+    // Remove if already selected
+    if (selectedSketches.includes(sketch)) {
+      setSelectedSketches(selectedSketches.filter((s) => s !== sketch));
+      return;
+    }
+
+    // No sketches selected
+    if (selectedSketches.length === 0) {
+      setSelectedSketches([sketch]);
+      return;
+    }
+
+    // Find current group
+    const currentGroup =
+      selectedSketches.includes("cms") ||
+      selectedSketches.includes("countsketch")
+        ? "frequency"
+        : selectedSketches.includes("hll")
+          ? "cardinality"
+          : "quantile";
+
+    // Allow only sketches from the same statistic
+    if (currentGroup === sketchGroup) {
+      setSelectedSketches([...selectedSketches, sketch]);
+    } else {
+      setMessage(
+        "These sketches estimate different statistics and cannot be compared together.",
+      );
+
+      setTimeout(() => {
+        setMessage("");
+      }, 3000);
+    }
+  }
+
+  const implementationColors = {
+    oxide: "#1f77b4",
+    datasketches: "#ff7f0e",
+    exact: "#2ca02c",
+    polars: "#d62728",
+    lib: "#9467bd",
+    "lib-vector2d-fast": "#8c564b",
+    "lib-vector2d-regular": "#e377c2",
+    "lib-fastpath-parallel": "#7f7f7f",
+    "lib-fixedmatrix-fast": "#bcbd22",
+    "lib-hip": "#17becf",
+  };
+
+  const yAxis = getYAxisConfig();
   return (
     <div className="accuracy-container">
       <h1>Accuracy vs Cost Tradeoff</h1>
@@ -103,23 +226,23 @@ function AccuracyVsCost() {
           <option value="query">Query Throughput</option>
         </select>
 
-        <label style={{ marginLeft: "20px" }}>
-          <strong>Sketch:</strong>
-        </label>
+        <div className="sketch-filter">
+          <strong>Sketches:</strong>
 
-        <select
-          className="metric-select"
-          value={selectedSketch}
-          onChange={(e) => setSelectedSketch(e.target.value)}
-        >
           {sketches.map((sketch) => (
-            <option key={sketch} value={sketch}>
+            <label key={sketch} className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={selectedSketches.includes(sketch)}
+                onChange={() => toggleSketch(sketch)}
+              />
               {sketch.toUpperCase()}
-            </option>
+            </label>
           ))}
-        </select>
+        </div>
       </div>
 
+      {message && <div className="warning-message">{message}</div>}
       <hr />
 
       <div className="chart-container">
@@ -148,10 +271,10 @@ function AccuracyVsCost() {
             <YAxis
               type="number"
               dataKey="y"
-              name="Accuracy (%)"
-              domain={[0, 100]}
+              name={yAxis.label}
+              domain={["auto", "auto"]}
               label={{
-                value: "Accuracy (%)",
+                value: yAxis.label,
                 angle: -90,
                 position: "insideLeft",
               }}
@@ -196,14 +319,23 @@ function AccuracyVsCost() {
                     </div>
 
                     <div>
-                      <strong>Accuracy:</strong> {point.y.toFixed(2)}%
+                      <strong>{yAxis.label}:</strong> {point.y.toFixed(4)}
                     </div>
                   </div>
                 );
               }}
             />
 
-            <Scatter data={filteredData} fill="#1976d2" />
+            <Legend verticalAlign="top" align="center" height={36} />
+
+            {Object.entries(groupedData).map(([impl, data]) => (
+              <Scatter
+                key={impl}
+                name={impl}
+                data={data}
+                fill={implementationColors[impl] || "#8884d8"}
+              />
+            ))}
           </ScatterChart>
         </ResponsiveContainer>
       </div>
@@ -220,10 +352,10 @@ function AccuracyVsCost() {
         <p>Current Cost Metric: {getXAxisLabel(selectedMetric)}</p>
 
         <p>
-          Selected Sketch:{" "}
-          {selectedSketch === "all"
-            ? "All Sketches"
-            : selectedSketch.toUpperCase()}
+          Selected Sketches:{" "}
+          {selectedSketches.length === 0
+            ? "None"
+            : selectedSketches.join(", ").toUpperCase()}
         </p>
       </div>
     </div>
