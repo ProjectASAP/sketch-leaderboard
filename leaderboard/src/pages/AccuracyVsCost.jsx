@@ -23,8 +23,6 @@ function AccuracyVsCost() {
   useEffect(() => {
     async function fetchData() {
       const data = await loadBenchmarkData();
-      console.log("Implementations:");
-      console.log([...new Set(data.map((item) => item.impl))]);
       setResults(data);
     }
 
@@ -46,11 +44,32 @@ function AccuracyVsCost() {
     }
   }
 
+  function getMemoryUnit(maxBytes) {
+    if (maxBytes >= 1024 * 1024 * 1024) {
+      return {
+        unit: "GB",
+        divisor: 1024 * 1024 * 1024,
+      };
+    }
+
+    if (maxBytes >= 1024 * 1024) {
+      return {
+        unit: "MB",
+        divisor: 1024 * 1024,
+      };
+    }
+
+    return {
+      unit: "KB",
+      divisor: 1024,
+    };
+  }
+
   // X-axis label based on the selected metric
-  function getXAxisLabel(metric) {
+  function getXAxisLabel(metric, memoryUnit) {
     switch (metric) {
       case "memory":
-        return "Memory (Bytes)";
+        return `Memory (${memoryUnit})`;
 
       case "query":
         return "Query Throughput (Million items/sec)";
@@ -135,9 +154,23 @@ function AccuracyVsCost() {
       ? []
       : chartData.filter((item) => selectedSketches.includes(item.sketch));
 
-  const groupedData = {};
+  const skippedPoints = filteredData.filter(
+    (item) => selectedMetric === "memory" && item.x <= 0,
+  );
 
-  filteredData.forEach((item) => {
+  const groupedData = {};
+  const plottedData = filteredData.filter(
+    (item) => selectedMetric !== "memory" || item.x > 0,
+  );
+
+  const maxMemoryBytes =
+    selectedMetric === "memory" && filteredData.length > 0
+      ? Math.max(...filteredData.map((item) => item.x))
+      : 0;
+
+  const memoryScale = getMemoryUnit(maxMemoryBytes);
+
+  plottedData.forEach((item) => {
     if (!groupedData[item.implementation]) {
       groupedData[item.implementation] = [];
     }
@@ -186,6 +219,22 @@ function AccuracyVsCost() {
         setMessage("");
       }, 3000);
     }
+  }
+
+  function formatMemory(value) {
+    if (value >= 1024 ** 3) {
+      return `${(value / 1024 ** 3).toFixed(2)} GB`;
+    }
+
+    if (value >= 1024 ** 2) {
+      return `${(value / 1024 ** 2).toFixed(2)} MB`;
+    }
+
+    if (value >= 1024) {
+      return `${(value / 1024).toFixed(2)} KB`;
+    }
+
+    return `${value} B`;
   }
 
   const implementationColors = {
@@ -261,11 +310,21 @@ function AccuracyVsCost() {
               type="number"
               dataKey="x"
               name={getXAxisLabel(selectedMetric)}
+              scale={selectedMetric === "memory" ? "log" : "linear"}
+              domain={
+                selectedMetric === "memory"
+                  ? ["dataMin", "dataMax"]
+                  : ["auto", "auto"]
+              }
+              allowDataOverflow
               label={{
                 value: getXAxisLabel(selectedMetric),
                 position: "insideBottom",
                 offset: -10,
               }}
+              tickFormatter={
+                selectedMetric === "memory" ? formatMemory : undefined
+              }
             />
 
             <YAxis
@@ -312,9 +371,14 @@ function AccuracyVsCost() {
                     <hr />
 
                     <div>
-                      <strong>{getXAxisLabel(selectedMetric)}:</strong>{" "}
+                      <strong>
+                        {selectedMetric === "memory"
+                          ? "Memory"
+                          : getXAxisLabel(selectedMetric)}
+                        :
+                      </strong>{" "}
                       {selectedMetric === "memory"
-                        ? point.x
+                        ? formatMemory(point.x)
                         : point.x.toFixed(2)}
                     </div>
 
@@ -340,6 +404,27 @@ function AccuracyVsCost() {
         </ResponsiveContainer>
       </div>
 
+      {selectedMetric === "memory" && skippedPoints.length > 0 && (
+        <details className="skipped-points">
+          <summary>
+            Skipped data points with invalid memory values (
+            {skippedPoints.length})
+          </summary>
+
+          <div className="skipped-points-content">
+            {skippedPoints.map((point, index) => (
+              <div key={`${point.sketch}-${point.implementation}-${index}`}>
+                <strong>{point.sketch.toUpperCase()}</strong>
+                {" — "}
+                {point.implementation}
+                {" — "}
+                Memory: {point.x} Bytes
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
       <hr />
 
       <div className="summary-section">
@@ -347,9 +432,13 @@ function AccuracyVsCost() {
 
         <p>Total Records Loaded: {results.length}</p>
 
-        <p>Points Plotted: {filteredData.length}</p>
+        <p>Points Plotted: {plottedData.length}</p>
 
-        <p>Current Cost Metric: {getXAxisLabel(selectedMetric)}</p>
+        <p>Skipped Points: {skippedPoints.length}</p>
+
+        <p>
+          Current Cost Metric: {getXAxisLabel(selectedMetric, memoryScale.unit)}
+        </p>
 
         <p>
           Selected Sketches:{" "}
