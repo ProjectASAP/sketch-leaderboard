@@ -18,6 +18,7 @@ function AccuracyVsCost() {
   const [results, setResults] = useState([]);
   const [selectedMetric, setSelectedMetric] = useState("memory");
   const [selectedSketches, setSelectedSketches] = useState([]);
+  const [xAxisScale, setXAxisScale] = useState("log");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -65,11 +66,30 @@ function AccuracyVsCost() {
     };
   }
 
+  function generateLogTicks(min, max) {
+    if (min <= 0 || max <= 0) return [];
+
+    const ticks = [];
+
+    // Start from the power of 2 just below or equal to min
+    let tick = 2 ** Math.floor(Math.log2(min));
+
+    while (tick <= max) {
+      if (tick >= min) {
+        ticks.push(tick);
+      }
+
+      tick *= 2;
+    }
+
+    return ticks;
+  }
+
   // X-axis label based on the selected metric
-  function getXAxisLabel(metric, memoryUnit) {
+  function getXAxisLabel(metric) {
     switch (metric) {
       case "memory":
-        return `Memory (${memoryUnit})`;
+        return "Memory";
 
       case "query":
         return "Query Throughput (Million items/sec)";
@@ -155,13 +175,27 @@ function AccuracyVsCost() {
       : chartData.filter((item) => selectedSketches.includes(item.sketch));
 
   const skippedPoints = filteredData.filter(
-    (item) => selectedMetric === "memory" && item.x <= 0,
+    (item) => xAxisScale === "log" && item.x <= 0,
   );
 
   const groupedData = {};
   const plottedData = filteredData.filter(
     (item) => selectedMetric !== "memory" || item.x > 0,
   );
+
+  const positiveXValues = plottedData
+    .map((item) => item.x)
+    .filter((value) => value > 0);
+
+  const logTicks =
+    selectedMetric === "memory" &&
+    xAxisScale === "log" &&
+    positiveXValues.length > 0
+      ? generateLogTicks(
+          Math.min(...positiveXValues),
+          Math.max(...positiveXValues),
+        )
+      : undefined;
 
   const maxMemoryBytes =
     selectedMetric === "memory" && filteredData.length > 0
@@ -275,6 +309,19 @@ function AccuracyVsCost() {
           <option value="query">Query Throughput</option>
         </select>
 
+        <label>
+          <strong>X-Axis Scale:</strong>
+        </label>
+
+        <select
+          className="metric-select"
+          value={xAxisScale}
+          onChange={(e) => setXAxisScale(e.target.value)}
+        >
+          <option value="linear">Linear</option>
+          <option value="log">Logarithmic</option>
+        </select>
+
         <div className="sketch-filter">
           <strong>Sketches:</strong>
 
@@ -309,14 +356,13 @@ function AccuracyVsCost() {
             <XAxis
               type="number"
               dataKey="x"
+              scale={xAxisScale}
               name={getXAxisLabel(selectedMetric)}
-              scale={selectedMetric === "memory" ? "log" : "linear"}
               domain={
-                selectedMetric === "memory"
-                  ? ["dataMin", "dataMax"]
-                  : ["auto", "auto"]
+                xAxisScale === "log" ? ["dataMin", "dataMax"] : ["auto", "auto"]
               }
-              allowDataOverflow
+              ticks={xAxisScale === "log" ? logTicks : undefined}
+              allowDataOverflow={xAxisScale === "log"}
               label={{
                 value: getXAxisLabel(selectedMetric),
                 position: "insideBottom",
