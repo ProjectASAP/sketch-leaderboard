@@ -18,13 +18,12 @@ function AccuracyVsCost() {
   const [results, setResults] = useState([]);
   const [selectedMetric, setSelectedMetric] = useState("memory");
   const [selectedSketches, setSelectedSketches] = useState([]);
+  const [xAxisScale, setXAxisScale] = useState("log");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     async function fetchData() {
       const data = await loadBenchmarkData();
-      console.log("Implementations:");
-      console.log([...new Set(data.map((item) => item.impl))]);
       setResults(data);
     }
 
@@ -46,11 +45,51 @@ function AccuracyVsCost() {
     }
   }
 
+  function getMemoryUnit(maxBytes) {
+    if (maxBytes >= 1024 * 1024 * 1024) {
+      return {
+        unit: "GB",
+        divisor: 1024 * 1024 * 1024,
+      };
+    }
+
+    if (maxBytes >= 1024 * 1024) {
+      return {
+        unit: "MB",
+        divisor: 1024 * 1024,
+      };
+    }
+
+    return {
+      unit: "KB",
+      divisor: 1024,
+    };
+  }
+
+  function generateLogTicks(min, max) {
+    if (min <= 0 || max <= 0) return [];
+
+    const ticks = [];
+
+    // Start from the power of 2 just below or equal to min
+    let tick = 2 ** Math.floor(Math.log2(min));
+
+    while (tick <= max) {
+      if (tick >= min) {
+        ticks.push(tick);
+      }
+
+      tick *= 2;
+    }
+
+    return ticks;
+  }
+
   // X-axis label based on the selected metric
   function getXAxisLabel(metric) {
     switch (metric) {
       case "memory":
-        return "Memory (Bytes)";
+        return "Memory";
 
       case "query":
         return "Query Throughput (Million items/sec)";
@@ -135,9 +174,37 @@ function AccuracyVsCost() {
       ? []
       : chartData.filter((item) => selectedSketches.includes(item.sketch));
 
-  const groupedData = {};
+  const skippedPoints = filteredData.filter(
+    (item) => xAxisScale === "log" && item.x <= 0,
+  );
 
-  filteredData.forEach((item) => {
+  const groupedData = {};
+  const plottedData = filteredData.filter(
+    (item) => selectedMetric !== "memory" || item.x > 0,
+  );
+
+  const positiveXValues = plottedData
+    .map((item) => item.x)
+    .filter((value) => value > 0);
+
+  const logTicks =
+    selectedMetric === "memory" &&
+    xAxisScale === "log" &&
+    positiveXValues.length > 0
+      ? generateLogTicks(
+          Math.min(...positiveXValues),
+          Math.max(...positiveXValues),
+        )
+      : undefined;
+
+  const maxMemoryBytes =
+    selectedMetric === "memory" && filteredData.length > 0
+      ? Math.max(...filteredData.map((item) => item.x))
+      : 0;
+
+  const memoryScale = getMemoryUnit(maxMemoryBytes);
+
+  plottedData.forEach((item) => {
     if (!groupedData[item.implementation]) {
       groupedData[item.implementation] = [];
     }
@@ -188,6 +255,22 @@ function AccuracyVsCost() {
     }
   }
 
+  function formatMemory(value) {
+    if (value >= 1024 ** 3) {
+      return `${(value / 1024 ** 3).toFixed(2)} GB`;
+    }
+
+    if (value >= 1024 ** 2) {
+      return `${(value / 1024 ** 2).toFixed(2)} MB`;
+    }
+
+    if (value >= 1024) {
+      return `${(value / 1024).toFixed(2)} KB`;
+    }
+
+    return `${value} B`;
+  }
+
   const implementationColors = {
     oxide: "#1f77b4",
     datasketches: "#ff7f0e",
@@ -226,6 +309,19 @@ function AccuracyVsCost() {
           <option value="query">Query Throughput</option>
         </select>
 
+        <label>
+          <strong>X-Axis Scale:</strong>
+        </label>
+
+        <select
+          className="metric-select"
+          value={xAxisScale}
+          onChange={(e) => setXAxisScale(e.target.value)}
+        >
+          <option value="linear">Linear</option>
+          <option value="log">Logarithmic</option>
+        </select>
+
         <div className="sketch-filter">
           <strong>Sketches:</strong>
 
@@ -260,12 +356,21 @@ function AccuracyVsCost() {
             <XAxis
               type="number"
               dataKey="x"
+              scale={xAxisScale}
               name={getXAxisLabel(selectedMetric)}
+              domain={
+                xAxisScale === "log" ? ["dataMin", "dataMax"] : ["auto", "auto"]
+              }
+              ticks={xAxisScale === "log" ? logTicks : undefined}
+              allowDataOverflow={xAxisScale === "log"}
               label={{
                 value: getXAxisLabel(selectedMetric),
                 position: "insideBottom",
                 offset: -10,
               }}
+              tickFormatter={
+                selectedMetric === "memory" ? formatMemory : undefined
+              }
             />
 
             <YAxis
@@ -312,9 +417,14 @@ function AccuracyVsCost() {
                     <hr />
 
                     <div>
-                      <strong>{getXAxisLabel(selectedMetric)}:</strong>{" "}
+                      <strong>
+                        {selectedMetric === "memory"
+                          ? "Memory"
+                          : getXAxisLabel(selectedMetric)}
+                        :
+                      </strong>{" "}
                       {selectedMetric === "memory"
-                        ? point.x
+                        ? formatMemory(point.x)
                         : point.x.toFixed(2)}
                     </div>
 
@@ -340,6 +450,27 @@ function AccuracyVsCost() {
         </ResponsiveContainer>
       </div>
 
+      {selectedMetric === "memory" && skippedPoints.length > 0 && (
+        <details className="skipped-points">
+          <summary>
+            Skipped data points with invalid memory values (
+            {skippedPoints.length})
+          </summary>
+
+          <div className="skipped-points-content">
+            {skippedPoints.map((point, index) => (
+              <div key={`${point.sketch}-${point.implementation}-${index}`}>
+                <strong>{point.sketch.toUpperCase()}</strong>
+                {" — "}
+                {point.implementation}
+                {" — "}
+                Memory: {point.x} Bytes
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
       <hr />
 
       <div className="summary-section">
@@ -347,9 +478,13 @@ function AccuracyVsCost() {
 
         <p>Total Records Loaded: {results.length}</p>
 
-        <p>Points Plotted: {filteredData.length}</p>
+        <p>Points Plotted: {plottedData.length}</p>
 
-        <p>Current Cost Metric: {getXAxisLabel(selectedMetric)}</p>
+        <p>Skipped Points: {skippedPoints.length}</p>
+
+        <p>
+          Current Cost Metric: {getXAxisLabel(selectedMetric, memoryScale.unit)}
+        </p>
 
         <p>
           Selected Sketches:{" "}
