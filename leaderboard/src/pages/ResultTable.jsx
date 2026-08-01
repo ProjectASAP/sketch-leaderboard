@@ -1,20 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { loadBenchmarkData } from "../utils/loadJson";
+import { useBenchmarkData } from "../hooks/useBenchmarkData";
 import "./ResultTable.css";
 
 function ResultTable() {
-  const [results, setResults] = useState([]);
+  const { records: results } = useBenchmarkData();
   const [sketchFilter, setSketchFilter] = useState("all");
-
-  useEffect(() => {
-    async function fetchData() {
-      const data = await loadBenchmarkData();
-      setResults(data);
-    }
-
-    fetchData();
-  }, []);
 
   const families = [...new Set(results.map((r) => r.sketch))].sort();
   // Keep each row's original index so detail links stay correct when filtered.

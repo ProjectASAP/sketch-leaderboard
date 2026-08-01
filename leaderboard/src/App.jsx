@@ -7,10 +7,11 @@ import ResultDetails from "./pages/ResultDetails";
 import Throughput from "./pages/Throughput";
 import Visualization from "./pages/Visualization";
 import DecisionSupport from "./pages/DecisionSupport";
+import { BenchmarkDataProvider } from "./context/BenchmarkDataContext";
 
 function App() {
   return (
-    <>
+    <BenchmarkDataProvider>
       <Navbar />
 
       <Routes>
@@ -22,7 +23,7 @@ function App() {
         <Route path="/visualization" element={<Visualization />} />
         <Route path="/decision" element={<DecisionSupport />} />
       </Routes>
-    </>
+    </BenchmarkDataProvider>
   );
 }
 

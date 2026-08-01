@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { loadBenchmarkData } from "../utils/loadJson";
+import { useBenchmarkData } from "../hooks/useBenchmarkData";
 import {
   formatConfig,
   insertMops,
@@ -42,13 +41,9 @@ function Card({ title, children }) {
 
 function ResultDetails() {
   const { index } = useParams();
-  const [records, setRecords] = useState(null);
+  const { records, loading } = useBenchmarkData();
 
-  useEffect(() => {
-    loadBenchmarkData().then(setRecords);
-  }, []);
-
-  if (records === null) {
+  if (loading) {
     return <div style={{ padding: "20px" }}>Loading…</div>;
   }
 

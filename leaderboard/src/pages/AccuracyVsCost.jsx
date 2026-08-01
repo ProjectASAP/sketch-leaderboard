@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { loadBenchmarkData } from "../utils/loadJson";
+import { useState } from "react";
+import { useBenchmarkData } from "../hooks/useBenchmarkData";
 
 import {
   ScatterChart,
@@ -15,20 +15,11 @@ import {
 import "./AccuracyVsCost.css";
 
 function AccuracyVsCost() {
-  const [results, setResults] = useState([]);
+  const { records: results } = useBenchmarkData();
   const [selectedMetric, setSelectedMetric] = useState("memory");
   const [selectedSketches, setSelectedSketches] = useState([]);
   const [xAxisScale, setXAxisScale] = useState("log");
   const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    async function fetchData() {
-      const data = await loadBenchmarkData();
-      setResults(data);
-    }
-
-    fetchData();
-  }, []);
 
   function getCostValue(item, metric) {
     switch (metric) {

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { loadBenchmarkData } from "../utils/loadJson";
+import { useMemo, useState } from "react";
+import { useBenchmarkData } from "../hooks/useBenchmarkData";
 import "./ResultTable.css";
 
 function formatConfig(item) {
@@ -57,14 +57,10 @@ function ThroughputBar({ value, max, color, logScale }) {
 }
 
 function Throughput() {
-  const [records, setRecords] = useState([]);
+  const { records } = useBenchmarkData();
   const [selectedSketch, setSelectedSketch] = useState("");
   const [selectedConfig, setSelectedConfig] = useState("");
   const [logScale, setLogScale] = useState(false);
-
-  useEffect(() => {
-    loadBenchmarkData().then(setRecords);
-  }, []);
 
   const families = useMemo(
     () => [...new Set(records.map((r) => r.sketch))].sort(),
