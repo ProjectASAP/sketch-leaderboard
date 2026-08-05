@@ -7,6 +7,11 @@ import { BenchmarkDataContext } from "./benchmarkDataContextValue";
 // and parsing the file itself.
 export function BenchmarkDataProvider({ children }) {
   const [records, setRecords] = useState([]);
+  // Non-fatal findings from validation — an unrecognised key, a statistic
+  // whose sample count looks off. Carried beside the records so the UI can
+  // report them; fatal problems arrive as `error` instead, and there are no
+  // records at all in that case.
+  const [problems, setProblems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -15,7 +20,9 @@ export function BenchmarkDataProvider({ children }) {
 
     loadBenchmarkData()
       .then((data) => {
-        if (!cancelled) setRecords(data);
+        if (cancelled) return;
+        setRecords(data.records);
+        setProblems(data.problems);
       })
       .catch((err) => {
         if (!cancelled) setError(err);
@@ -30,7 +37,7 @@ export function BenchmarkDataProvider({ children }) {
   }, []);
 
   return (
-    <BenchmarkDataContext.Provider value={{ records, loading, error }}>
+    <BenchmarkDataContext.Provider value={{ records, problems, loading, error }}>
       {children}
     </BenchmarkDataContext.Provider>
   );

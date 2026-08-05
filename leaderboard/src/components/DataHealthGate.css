@@ -1,0 +1,83 @@
+.data-health {
+  margin: 1.5rem auto;
+  max-width: 60rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+/* Fatal: the pages are not rendered at all behind this, so it reads as a
+   destination rather than a notice. */
+.data-health--fatal {
+  border-color: #b3261e;
+  background: #fff5f5;
+  color: #4a1512;
+}
+
+.data-health--warn {
+  border-color: #b8860b;
+  background: #fffbeb;
+  color: #4a3708;
+}
+
+.data-health__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 650;
+}
+
+.data-health__badge {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.data-health__lead {
+  margin: 0 0 1rem;
+}
+
+.data-health code {
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.07);
+  font-size: 0.9em;
+}
+
+.data-health__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.data-health__list li {
+  display: grid;
+  /* Field name sized to content, message takes the slack, location pinned
+     right — so a long message never pushes the line number out of view. */
+  grid-template-columns: minmax(8rem, max-content) 1fr max-content;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.data-health__field {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.data-health__message {
+  overflow-wrap: anywhere;
+}
+
+.data-health__where {
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (max-width: 40rem) {
+  .data-health__list li {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+}
