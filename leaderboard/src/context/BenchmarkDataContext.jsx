@@ -37,7 +37,9 @@ export function BenchmarkDataProvider({ children }) {
   }, []);
 
   return (
-    <BenchmarkDataContext.Provider value={{ records, problems, loading, error }}>
+    <BenchmarkDataContext.Provider
+      value={{ records, problems, loading, error }}
+    >
       {children}
     </BenchmarkDataContext.Provider>
   );

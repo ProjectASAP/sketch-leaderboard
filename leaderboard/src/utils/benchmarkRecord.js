@@ -211,7 +211,9 @@ function isWorkload(v) {
 }
 
 const isSketchConfig = (v) =>
-  isPlainObject(v) && typeof v.algorithm === "string" && isPlainObject(v.params);
+  isPlainObject(v) &&
+  typeof v.algorithm === "string" &&
+  isPlainObject(v.params);
 
 const TYPE_GUARDS = {
   integer: isInteger,
@@ -329,9 +331,7 @@ export function validateRecord(raw, line) {
       continue; // a legitimate null needs no type check
     }
     if (!TYPE_GUARDS[kind](value)) {
-      problems.push(
-        problem(line, key, "error", `not a well-formed ${kind}`),
-      );
+      problems.push(problem(line, key, "error", `not a well-formed ${kind}`));
     }
   }
 
@@ -379,7 +379,10 @@ export function validateRecord(raw, line) {
   // normally appear and vanish together. Only a warning: an impl that declares
   // no query capability still runs the pass timed-only, which legitimately
   // yields query timings with no accuracy.
-  if ((raw.accuracy === null) !== (raw.query_throughput_items_per_sec === null)) {
+  if (
+    (raw.accuracy === null) !==
+    (raw.query_throughput_items_per_sec === null)
+  ) {
     problems.push(
       problem(
         line,
@@ -404,11 +407,18 @@ export function validateRecord(raw, line) {
     if (!isRunStats(stats)) continue; // already reported by the type layer
     if (stats.stddev < 0) {
       problems.push(
-        problem(line, path, "error", `stddev must be >= 0, got ${stats.stddev}`),
+        problem(
+          line,
+          path,
+          "error",
+          `stddev must be >= 0, got ${stats.stddev}`,
+        ),
       );
     }
     if (stats.n < 1) {
-      problems.push(problem(line, path, "error", `n must be >= 1, got ${stats.n}`));
+      problems.push(
+        problem(line, path, "error", `n must be >= 1, got ${stats.n}`),
+      );
     }
     // Only an *excess* is suspicious. `n` under-running `runs` is normal and
     // common: the accuracy comparator attaches to the first measured run only
@@ -445,8 +455,7 @@ export class SchemaViolation extends Error {
       .slice(0, 5)
       .map((p) => `  line ${p.line}: ${p.field} — ${p.message}`)
       .join("\n");
-    const more =
-      errors.length > 5 ? `\n  …and ${errors.length - 5} more` : "";
+    const more = errors.length > 5 ? `\n  …and ${errors.length - 5} more` : "";
     super(
       `all.jsonl failed validation with ${errors.length} error(s):\n${shown}${more}`,
     );
@@ -482,7 +491,9 @@ export function parseBenchmarkJsonl(text) {
     try {
       parsed = JSON.parse(trimmed);
     } catch (err) {
-      problems.push(problem(line, "(json)", "error", `not valid JSON: ${err.message}`));
+      problems.push(
+        problem(line, "(json)", "error", `not valid JSON: ${err.message}`),
+      );
       return;
     }
 
@@ -494,7 +505,9 @@ export function parseBenchmarkJsonl(text) {
   });
 
   if (records.length === 0 && problems.length === 0) {
-    problems.push(problem(0, "(file)", "error", "no records found — file is empty"));
+    problems.push(
+      problem(0, "(file)", "error", "no records found — file is empty"),
+    );
   }
 
   return { records, problems };

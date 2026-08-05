@@ -88,9 +88,7 @@ function FailurePanel({ error }) {
 
       {errors.length > 0 && <ProblemList items={errors} />}
 
-      {!problems.length && (
-        <p className="data-health__lead">{error.message}</p>
-      )}
+      {!problems.length && <p className="data-health__lead">{error.message}</p>}
     </div>
   );
 }
