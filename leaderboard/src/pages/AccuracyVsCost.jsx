@@ -386,6 +386,7 @@ function AccuracyVsCost() {
             />
 
             <Tooltip
+              isAnimationActive={false}
               formatter={(value, name) => [
                 typeof value === "number" ? value.toFixed(2) : value,
                 name,
