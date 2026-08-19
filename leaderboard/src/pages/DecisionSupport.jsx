@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { loadBenchmarkData } from "../utils/loadJson";
+import { useMemo, useState } from "react";
+import { useBenchmarkData } from "../hooks/useBenchmarkData";
 import "./ResultTable.css";
 
 function formatConfig(item) {
@@ -127,7 +127,7 @@ function ScoreBar({ score }) {
 }
 
 function DecisionSupport() {
-  const [records, setRecords] = useState([]);
+  const { records } = useBenchmarkData();
   const [sketchFilter, setSketchFilter] = useState("any");
 
   // constraints
@@ -140,10 +140,6 @@ function DecisionSupport() {
   const [speedPri, setSpeedPri] = useState(3);
   const [memoryPri, setMemoryPri] = useState(3);
   const [accuracyPri, setAccuracyPri] = useState(3);
-
-  useEffect(() => {
-    loadBenchmarkData().then(setRecords);
-  }, []);
 
   function reset() {
     setSketchFilter("any");

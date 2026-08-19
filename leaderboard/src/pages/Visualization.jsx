@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -9,7 +9,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { loadBenchmarkData } from "../utils/loadJson";
+import { useBenchmarkData } from "../hooks/useBenchmarkData";
 import "./ResultTable.css";
 
 function formatConfig(item) {
@@ -171,15 +171,11 @@ function StackedChart({
 }
 
 function Visualization() {
-  const [records, setRecords] = useState([]);
+  const { records } = useBenchmarkData();
   const [selectedSketch, setSelectedSketch] = useState("");
   const [selectedWorkload, setSelectedWorkload] = useState("all");
   const [selectedConfig, setSelectedConfig] = useState("");
   const [logScale, setLogScale] = useState(false);
-
-  useEffect(() => {
-    loadBenchmarkData().then(setRecords);
-  }, []);
 
   const families = useMemo(
     () => [...new Set(records.map((r) => r.sketch))].sort(),
