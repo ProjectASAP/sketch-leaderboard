@@ -7,230 +7,234 @@
 // ranking. A record that fails here should be treated as "this file is not
 // what the benchmark wrote", not as a row to quietly skip.
 //
+// ── Where the field knowledge lives ─────────────────────────────────────
+// `schema.json` is generated from the Rust `MergedRecord` by
+// `aqpbm-core`'s `schema_export_is_current` test and copied here verbatim.
+// It is the only place field names, types and optionality are stated. This
+// file used to restate all three by hand — ~150 lines of them — and that copy
+// fell behind the Rust without anything noticing: `accuracy` had become
+// `query_accuracy`, `latency_ns` had split per-operation, and eleven
+// `prepare_*` / `merge_*` fields had appeared. Nothing here can fail a Rust
+// build, so nothing here should be in a position to disagree with it.
+//
+// To update after a MergedRecord change, in sketch-bench:
+//   UPDATE_SCHEMA=1 cargo test -p aqpbm-core --features schema \
+//     schema_export_is_current
+// then copy aqpbm-core/schema/merged_record.schema.json over schema.json.
+//
 // ── The four sections below, in the order they run ──────────────────────
-//   1. SCHEMA        the field list mirroring the Rust type
-//   2. type guards   what a well-formed value of each kind looks like
-//   3. record rules  per-record structural + semantic checks
+//   1. SCHEMA        what is read out of schema.json
+//   2. ajv           the generated structural check, and its error mapping
+//   3. record rules  the checks the schema cannot express
 //   4. file parsing  JSONL → records, collecting every problem found
 //
-// Section 1 is the part that duplicates knowledge held in Rust
-// (aqpbm-core/src/report.rs) and should eventually be generated from it — see
-// the note on RECORD_KEYS. Sections 2-4 have no Rust counterpart: they check
-// things `flatten_record.rs` never looks at, because that code only moves
-// values between structs and never inspects them.
+// Sections 3-4 have no Rust counterpart: they check things `flatten_record.rs`
+// never looks at, because that code only moves values between structs and
+// never inspects them.
 
-/** Schema version this validator understands. */
-export const SCHEMA_VERSION = 3;
+import Ajv from "ajv/dist/2020.js";
+import addFormats from "ajv-formats";
+// The import attribute is required by Node and accepted by Vite, so this
+// module can also be exercised outside the bundler.
+import schema from "./schema.json" with { type: "json" };
 
 // ─────────────────────────────────────────────────────────────────────────
 // 1. SCHEMA
 // ─────────────────────────────────────────────────────────────────────────
 
 /**
- * Every key a v3 flat record carries.
- *
- * `MergedRecord` sets no `skip_serializing_if`, so serde writes every field on
- * every line even when the value is null. The key set is therefore an exact
- * contract, not a minimum — which makes "is this key set intact?" the single
- * cheapest and strongest corruption check available. A record missing a key
- * was not produced by this pipeline.
- *
- * TODO: generate from the Rust type. A hand-maintained copy drifts the moment
- * someone adds a field, and that is not hypothetical — adding `merge_accuracy`
- * to MergedRecord is exactly what broke flatten_record.rs, which only survived
- * because Rust's exhaustive destructuring failed the build. Nothing here can
- * fail a build, so this list needs a test on the Rust side to stay honest.
+ * Schema version this validator understands, as stamped into the generated
+ * document by the Rust exporter. Not a literal here: a version bump reaches
+ * this file the same way every other schema change does, by re-copying
+ * schema.json.
  */
-export const RECORD_KEYS = Object.freeze([
-  "schema_version",
-  "sketch",
-  "impl",
-  "language",
-  "mode",
+export const SCHEMA_VERSION = schema["x-schema-version"];
+
+/**
+ * Every key a flat record carries.
+ *
+ * `schema.required` is the generated answer to "which keys does serde always
+ * write?" — the exporter determines it by serialising an all-`None` record and
+ * observing the result, so a field gaining or losing `skip_serializing_if`
+ * moves in this set on its own. That makes "is this key set intact?" the
+ * cheapest and strongest corruption check available, and ajv enforces it
+ * directly from the document.
+ */
+export const RECORD_KEYS = Object.freeze(Object.keys(schema.properties));
+
+/** Fast membership test for the unknown-key warning below. */
+const KNOWN_KEYS = new Set(RECORD_KEYS);
+
+/**
+ * Which `$defs` type a property resolves to, seeing through the
+ * `anyOf: [{$ref}, {type: "null"}]` that schemars emits for an `Option<T>`.
+ * Used to find the RunStats-shaped values section 3 walks, so that list is
+ * derived from the schema rather than restated.
+ */
+function refName(node) {
+  if (!node || typeof node !== "object") return null;
+  if (typeof node.$ref === "string") {
+    return node.$ref.replace("#/$defs/", "");
+  }
+  for (const branch of node.anyOf ?? node.oneOf ?? []) {
+    const name = refName(branch);
+    if (name) return name;
+  }
+  return null;
+}
+
+const RUN_STATS_KEYS = [];
+const CPU_TIME_KEYS = [];
+for (const [key, node] of Object.entries(schema.properties)) {
+  const name = refName(node);
+  if (name === "RunStats") RUN_STATS_KEYS.push(key);
+  else if (name === "CpuTime") CPU_TIME_KEYS.push(key);
+}
+
+/**
+ * Field names the hand-written rules in section 3 mention.
+ *
+ * Those rules are the part that cannot be generated, so they are also the part
+ * that can still drift — a rule naming a field the Rust has since renamed goes
+ * quiet rather than wrong, which is worse. Checking the names against the
+ * schema once, at module load, turns that silence into a failure the next
+ * person cannot miss.
+ */
+const RULE_FIELDS = [
   "runs",
-  "source",
-  "sketch_config",
-  "workload",
   "memory_bytes",
   "heap_bytes_net",
   "heap_bytes_peak",
-  "accuracy",
-  "insert_timestamp",
-  "insert_throughput_items_per_sec",
-  "insert_throughput_samples",
-  "insert_build_throughput_items_per_sec",
-  "insert_finalize_time_ms",
-  "insert_cpu_time_ms",
-  "insert_wall_time_ms",
-  "insert_rss_peak_kb",
-  "insert_heap_allocated_kb",
-  "query_timestamp",
-  "query_throughput_items_per_sec",
-  "query_cpu_time_ms",
-  "query_wall_time_ms",
-  "query_rss_peak_kb",
-  "query_heap_allocated_kb",
-  "latency_timestamp",
-  "latency_ns",
-  "merge_timestamp",
+  "merge_supported",
   "merge_time_ms",
   "merge_shards",
-  "merge_supported",
-  "merge_accuracy",
-]);
+  "query_accuracy",
+  "query_throughput_items_per_sec",
+];
+const missingRuleFields = RULE_FIELDS.filter((f) => !KNOWN_KEYS.has(f));
+if (missingRuleFields.length > 0) {
+  throw new Error(
+    `benchmarkRecord.js: the semantic rules name ${missingRuleFields.join(", ")}, ` +
+      `which schema.json (v${SCHEMA_VERSION}) no longer defines. ` +
+      `Update the rules in section 3 to the current field names.`,
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// 2. AJV
+// ─────────────────────────────────────────────────────────────────────────
+
+// `strict: false` because schemars tags integer widths as formats — `uint64`,
+// `uint`, `double` — which ajv does not know and would otherwise refuse to
+// compile. `date-time` *is* known, and ajv-formats makes it a real check
+// rather than a decoration.
+// `verbose` so each error carries the offending value: a message naming what
+// was actually there beats one that only names what was wanted.
+const ajv = new Ajv({ allErrors: true, strict: false, verbose: true });
+addFormats(ajv);
+
+/** Every `format` the document mentions, at any depth. */
+function formatsUsed(node, found = new Set()) {
+  if (Array.isArray(node)) {
+    for (const item of node) formatsUsed(item, found);
+  } else if (node && typeof node === "object") {
+    if (typeof node.format === "string") found.add(node.format);
+    for (const value of Object.values(node)) formatsUsed(value, found);
+  }
+  return found;
+}
+
+// Registered as accept-anything rather than left unknown, which ajv reports on
+// every occurrence — a wall of "unknown format uint64" in the console the
+// first time anyone opens the page. Widths carry no constraint ajv could
+// enforce anyway: the `minimum: 0` schemars emits beside them is what actually
+// bounds the value, and ajv already applies that. Discovered from the document
+// so a new numeric type on the Rust side needs no edit here.
+for (const name of formatsUsed(schema)) {
+  if (!ajv.formats[name]) ajv.addFormat(name, true);
+}
+
+const validateStructure = ajv.compile(schema);
+
+/** A dotted path a reader can find in the file, from an ajv instancePath. */
+const fieldOf = (instancePath) =>
+  instancePath === "" ? "(record)" : instancePath.slice(1).split("/").join(".");
 
 /**
- * Fields whose Rust type is not `Option<_>`, so serde can never write null.
- * Everything else may legitimately be null, meaning "not collected in this
- * run" rather than "damaged".
+ * ajv's errors, reduced to one problem per real fault.
  *
- * Kept deliberately short. It is tempting to also require the fields that
- * happen to be non-null in the current file, but most of those reflect one
- * run's flags, not the schema: every `*_rss_peak_kb` is null in all 303 rows
- * only because the binary was built with `heap-track` rather than jemalloc,
- * and `latency_ns` is null only because `--metrics latency` was not passed.
- * Requiring either would reject a perfectly valid file produced with
- * different flags.
+ * With `allErrors` and the `anyOf` that every optional field carries, a single
+ * malformed value yields three entries: one for the `$ref` branch, one for the
+ * `null` branch, and one for the `anyOf` itself. Only the first says anything
+ * useful, so the union keywords are dropped wherever a more specific error
+ * already points inside them.
  */
-export const REQUIRED_NON_NULL = Object.freeze([
-  "schema_version",
-  "sketch",
-  "impl",
-  "language",
-  "mode",
-  "runs",
-  "source",
-  "workload",
-]);
+function mapAjvErrors(errors, line) {
+  const specific = errors.filter((e) => {
+    if (e.keyword === "anyOf" || e.keyword === "oneOf") return false;
+    // The `null` half of an `Option<T>` rejects every non-null value, so it
+    // fires alongside the real error on any malformed one. "expected null"
+    // is never the fault being reported — nothing in this schema is
+    // required to be null — so it is noise in every case it appears.
+    if (e.keyword === "type" && e.params.type === "null") return false;
+    return true;
+  });
+  const kept = specific.length > 0 ? specific : errors;
 
-// Enum variants come from the Rust enums, not from what this dataset happens
-// to contain: today every row is rust/bench/cli, but the C++ track emits
-// language "cpp" and source "cpp-bench", and the embedded runtime sampler
-// emits the other three sources. Narrowing these to observed values would
-// reject valid data from those producers.
-const LANGUAGES = ["rust", "cpp"];
-const MODES = ["bench", "profile", "runtime"];
-const SOURCES = [
-  "cli",
-  "asap-fusion",
-  "data-collector",
-  "asap-query",
-  "cpp-bench",
-];
+  const seen = new Set();
+  const problems = [];
+  for (const err of kept) {
+    if (err.keyword === "required") {
+      // Qualified by where it is missing from: a bare "stddev" sends the
+      // reader looking for a top-level key that was never supposed to exist,
+      // where "insert_wall_time_ms.stddev" names the actual hole.
+      const key =
+        err.instancePath === ""
+          ? err.params.missingProperty
+          : `${fieldOf(err.instancePath)}.${err.params.missingProperty}`;
+      const dedupe = `required:${key}`;
+      if (seen.has(dedupe)) continue;
+      seen.add(dedupe);
+      problems.push(problem(line, key, "error", "key missing from record"));
+      continue;
+    }
 
-const FIELD_TYPES = {
-  schema_version: "integer",
-  sketch: "nonEmptyString",
-  impl: "nonEmptyString",
-  language: "language",
-  mode: "mode",
-  runs: "integer",
-  source: "source",
-  sketch_config: "sketchConfig",
-  workload: "workload",
-  memory_bytes: "integer",
-  heap_bytes_net: "integer",
-  heap_bytes_peak: "integer",
-  accuracy: "metricMap",
-  insert_timestamp: "timestamp",
-  insert_throughput_items_per_sec: "runStats",
-  insert_throughput_samples: "numberArray",
-  insert_build_throughput_items_per_sec: "runStats",
-  insert_finalize_time_ms: "runStats",
-  insert_cpu_time_ms: "cpuTime",
-  insert_wall_time_ms: "runStats",
-  insert_rss_peak_kb: "integer",
-  insert_heap_allocated_kb: "integer",
-  query_timestamp: "timestamp",
-  query_throughput_items_per_sec: "runStats",
-  query_cpu_time_ms: "cpuTime",
-  query_wall_time_ms: "runStats",
-  query_rss_peak_kb: "integer",
-  query_heap_allocated_kb: "integer",
-  latency_timestamp: "timestamp",
-  latency_ns: "latencySummary",
-  merge_timestamp: "timestamp",
-  merge_time_ms: "runStats",
-  merge_shards: "integer",
-  merge_supported: "boolean",
-  merge_accuracy: "metricMap",
-};
+    const field = fieldOf(err.instancePath);
+    const dedupe = `${field}:${err.keyword}`;
+    if (seen.has(dedupe)) continue;
+    seen.add(dedupe);
 
-// ─────────────────────────────────────────────────────────────────────────
-// 2. TYPE GUARDS
-// ─────────────────────────────────────────────────────────────────────────
-
-const isPlainObject = (v) =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
-
-// NaN and Infinity are excluded on purpose. They survive a JSON round trip as
-// null, so their appearance as a number means the value was written by
-// something other than serde_json — and a NaN compares unequal to itself,
-// which would poison any min/max normalisation downstream in buildLeaderboard.
-const isFiniteNumber = (v) => typeof v === "number" && Number.isFinite(v);
-const isInteger = (v) => Number.isInteger(v);
-
-/** aqpbm_core::RunStats — mean/stddev/n, with ci95 only under `--repeats`. */
-function isRunStats(v) {
-  if (!isPlainObject(v)) return false;
-  if (!isFiniteNumber(v.mean) || !isFiniteNumber(v.stddev)) return false;
-  if (!isInteger(v.n)) return false;
-  if (v.ci95 !== undefined && v.ci95 !== null) {
-    if (!Array.isArray(v.ci95) || v.ci95.length !== 2) return false;
-    if (!v.ci95.every(isFiniteNumber)) return false;
+    // ajv phrases these for a schema author; these read for someone looking at
+    // a data file. Everything else falls through to ajv's own wording, which
+    // is already specific enough ("must be <= 2 items", "must be integer").
+    let message;
+    switch (err.keyword) {
+      case "type":
+        message = `expected ${err.params.type}, got ${describe(err.data)}`;
+        break;
+      case "enum":
+        message = `not one of the permitted values: ${err.params.allowedValues.join(", ")}`;
+        break;
+      case "const":
+        message = `expected ${JSON.stringify(err.params.allowedValue)}`;
+        break;
+      case "format":
+        message = `not a well-formed ${err.params.format}`;
+        break;
+      default:
+        message = err.message;
+    }
+    problems.push(problem(line, field, "error", message));
   }
-  return true;
+  return problems;
 }
 
-const isCpuTime = (v) =>
-  isPlainObject(v) && isRunStats(v.user_ms) && isRunStats(v.sys_ms);
-
-const LATENCY_FIELDS = ["p50", "p95", "p99", "p999", "max", "count"];
-const isLatencySummary = (v) =>
-  isPlainObject(v) && LATENCY_FIELDS.every((f) => isInteger(v[f]));
-
-// Accuracy blobs are open maps: the key set differs per algorithm (hll reports
-// relative_error, kll mean_rank_err, cms/countsketch the are_topN family), and
-// the merge pass adds merge_lossless. Validating the names would hard-code one
-// algorithm's comparator, so only the value shape is checked.
-const isMetricMap = (v) =>
-  isPlainObject(v) && Object.values(v).every(isFiniteNumber);
-
-const isNumberArray = (v) => Array.isArray(v) && v.every(isFiniteNumber);
-
-const isTimestamp = (v) =>
-  typeof v === "string" && !Number.isNaN(Date.parse(v));
-
-function isWorkload(v) {
-  if (!isPlainObject(v)) return false;
-  if (typeof v.shape !== "string" || v.shape.length === 0) return false;
-  if (!isInteger(v.size)) return false;
-  // cardinality / zipf_s / seed / source_path / spec are all optional: a file
-  // workload has a source_path and no cardinality, a generated one the reverse.
-  return true;
+/** What a bad value actually was, for the type-mismatch message. */
+function describe(value) {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "an array";
+  return typeof value;
 }
-
-const isSketchConfig = (v) =>
-  isPlainObject(v) &&
-  typeof v.algorithm === "string" &&
-  isPlainObject(v.params);
-
-const TYPE_GUARDS = {
-  integer: isInteger,
-  boolean: (v) => typeof v === "boolean",
-  nonEmptyString: (v) => typeof v === "string" && v.length > 0,
-  language: (v) => LANGUAGES.includes(v),
-  mode: (v) => MODES.includes(v),
-  source: (v) => SOURCES.includes(v),
-  timestamp: isTimestamp,
-  runStats: isRunStats,
-  cpuTime: isCpuTime,
-  latencySummary: isLatencySummary,
-  metricMap: isMetricMap,
-  numberArray: isNumberArray,
-  workload: isWorkload,
-  sketchConfig: isSketchConfig,
-};
 
 // ─────────────────────────────────────────────────────────────────────────
 // 3. RECORD RULES
@@ -247,16 +251,21 @@ function problem(line, field, severity, message) {
   return { line, field, severity, message };
 }
 
+const isPlainObject = (v) =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+const isInteger = (v) => Number.isInteger(v);
+
 /** Every RunStats-shaped value in a record, for the checks that walk them. */
 function* runStatsEntries(record) {
-  for (const [key, kind] of Object.entries(FIELD_TYPES)) {
+  for (const key of RUN_STATS_KEYS) {
     const value = record[key];
-    if (value === null || value === undefined) continue;
-    if (kind === "runStats") yield [key, value];
-    if (kind === "cpuTime") {
-      yield [`${key}.user_ms`, value.user_ms];
-      yield [`${key}.sys_ms`, value.sys_ms];
-    }
+    if (isPlainObject(value)) yield [key, value];
+  }
+  for (const key of CPU_TIME_KEYS) {
+    const value = record[key];
+    if (!isPlainObject(value)) continue;
+    if (isPlainObject(value.user_ms)) yield [`${key}.user_ms`, value.user_ms];
+    if (isPlainObject(value.sys_ms)) yield [`${key}.sys_ms`, value.sys_ms];
   }
 }
 
@@ -278,16 +287,16 @@ export function validateRecord(raw, line) {
         line,
         "(record)",
         "error",
-        `expected a JSON object, got ${Array.isArray(raw) ? "an array" : typeof raw}`,
+        `expected a JSON object, got ${describe(raw)}`,
       ),
     ];
   }
 
   // ── version gate ──
-  // Checked before anything else, and returns early: a v2 record is not
-  // corrupt, it is old, and type-checking it against v3 would bury that one
-  // fact under thirty spurious field errors. v2 is a real possibility here —
-  // the file this app shipped with until now was v2.
+  // Checked before anything else, and returns early: an older record is not
+  // corrupt, it is old, and type-checking it against the current schema would
+  // bury that one fact under thirty spurious field errors. This is a live
+  // possibility, not a hypothetical — the file this app ships with is v3.
   if (raw.schema_version !== SCHEMA_VERSION) {
     return [
       problem(
@@ -300,38 +309,22 @@ export function validateRecord(raw, line) {
     ];
   }
 
-  // ── key set ──
-  const present = new Set(Object.keys(raw));
-  for (const key of RECORD_KEYS) {
-    if (!present.has(key)) {
-      problems.push(problem(line, key, "error", "key missing from record"));
-    }
+  // ── structure ──
+  // Key set, types, enum variants, nullability and the numeric bounds the Rust
+  // types imply, all from the generated schema.
+  if (!validateStructure(raw)) {
+    problems.push(...mapAjvErrors(validateStructure.errors, line));
   }
+
   // Extra keys are a warning, not an error: the schema grows additively, and a
   // reader that refuses unknown fields breaks every time the benchmark learns
-  // to measure something new. `merge_accuracy` was such an addition.
-  for (const key of present) {
-    if (!RECORD_KEYS.includes(key)) {
+  // to measure something new. The schema deliberately leaves
+  // `additionalProperties` unset so this severity stays the reader's call.
+  for (const key of Object.keys(raw)) {
+    if (!KNOWN_KEYS.has(key)) {
       problems.push(
         problem(line, key, "warning", "unrecognised key — newer schema?"),
       );
-    }
-  }
-
-  // ── types ──
-  for (const [key, kind] of Object.entries(FIELD_TYPES)) {
-    if (!present.has(key)) continue; // already reported as missing
-    const value = raw[key];
-    if (value === null) {
-      if (REQUIRED_NON_NULL.includes(key)) {
-        problems.push(
-          problem(line, key, "error", "null, but this field is never optional"),
-        );
-      }
-      continue; // a legitimate null needs no type check
-    }
-    if (!TYPE_GUARDS[kind](value)) {
-      problems.push(problem(line, key, "error", `not a well-formed ${kind}`));
     }
   }
 
@@ -380,13 +373,13 @@ export function validateRecord(raw, line) {
   // no query capability still runs the pass timed-only, which legitimately
   // yields query timings with no accuracy.
   if (
-    (raw.accuracy === null) !==
-    (raw.query_throughput_items_per_sec === null)
+    (raw.query_accuracy == null) !==
+    (raw.query_throughput_items_per_sec == null)
   ) {
     problems.push(
       problem(
         line,
-        "accuracy",
+        "query_accuracy",
         "warning",
         "accuracy and query throughput usually accompany each other; one is null and the other is not",
       ),
@@ -394,28 +387,15 @@ export function validateRecord(raw, line) {
   }
 
   // ── ranges ──
+  // Only the bounds the Rust types do not already imply. Every `u64` and
+  // `usize` arrives from schemars carrying `minimum: 0`, so ajv has covered
+  // the non-negative cases above; what it cannot know is where zero is itself
+  // impossible.
   if (isInteger(runs) && runs < 1) {
     problems.push(problem(line, "runs", "error", `must be >= 1, got ${runs}`));
   }
-  for (const key of ["memory_bytes", "heap_bytes_net", "heap_bytes_peak"]) {
-    const v = raw[key];
-    if (isInteger(v) && v < 0) {
-      problems.push(problem(line, key, "error", `must be >= 0, got ${v}`));
-    }
-  }
   for (const [path, stats] of runStatsEntries(raw)) {
-    if (!isRunStats(stats)) continue; // already reported by the type layer
-    if (stats.stddev < 0) {
-      problems.push(
-        problem(
-          line,
-          path,
-          "error",
-          `stddev must be >= 0, got ${stats.stddev}`,
-        ),
-      );
-    }
-    if (stats.n < 1) {
+    if (isInteger(stats.n) && stats.n < 1) {
       problems.push(
         problem(line, path, "error", `n must be >= 1, got ${stats.n}`),
       );
@@ -427,7 +407,7 @@ export function validateRecord(raw, line) {
     // Requiring equality flagged 392 valid rows, which is worse than not
     // checking — a warning that cries wolf is one nobody reads. An `n` larger
     // than `runs`, though, claims more samples than the run ever took.
-    if (isInteger(runs) && stats.n > runs) {
+    if (isInteger(runs) && isInteger(stats.n) && stats.n > runs) {
       problems.push(
         problem(
           line,
